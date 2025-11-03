@@ -30,6 +30,12 @@ class AccountRequest(AccountBaseRequest):
         from_attributes = True
 
 
+@router.get("/{user_id}")
+def list_accounts(user_id: int, db: Session = Depends(get_db_session)):
+    accounts = db.query(Account).filter(Account.user_id == user_id)
+    return accounts.all()
+
+
 @router.post("/")
 def create_account(
     account: AccountCreateRequest, db: Session = Depends(get_db_session)
@@ -48,12 +54,6 @@ def create_account(
             status_code=400,
             detail="An account with this name already exists for this user",
         )
-
-
-@router.get("/")
-def list_accounts(user_id: int, db: Session = Depends(get_db_session)):
-    accounts = db.query(Account).filter(Account.user_id == user_id)
-    return accounts.all()
 
 
 @router.get("/{account_id}")
