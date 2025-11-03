@@ -6,6 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from src.common.logger import get_logger
+from src.common.project_paths import cc_statement_dir
 from src.database import get_db_session
 
 from ..models import ProcessingStatus, Statement, StatementProcessing
@@ -17,9 +18,6 @@ from ..services.cc_statement_processor import CreditCardStatementProcessor
 
 router = APIRouter()
 
-# Define the data folder path
-DATA_FOLDER = Path(__file__).parent.parent.parent / "data" / "statements"
-DATA_FOLDER.mkdir(parents=True, exist_ok=True)
 
 log = get_logger(__name__)
 
@@ -127,7 +125,7 @@ def _generate_safe_filename(original_filename: str) -> tuple[str, Path]:
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_filename = f"{timestamp}_{original_filename}"
-    file_path = DATA_FOLDER / safe_filename
+    file_path = cc_statement_dir / safe_filename
     return safe_filename, file_path
 
 

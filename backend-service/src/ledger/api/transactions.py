@@ -18,6 +18,7 @@ class TransactionBase(BaseModel):
 
 
 class TransactionCreate(TransactionBase):
+    user_id: int
     entries: List[EntryCreate] = []
 
 
@@ -27,6 +28,7 @@ class TransactionUpdate(TransactionBase):
 
 class Transaction(TransactionBase):
     id: int
+    user_id: int
     entries: List[Entry] = []
 
     class Config:
@@ -41,6 +43,7 @@ def create_transaction(
     transaction: TransactionCreate, db: Session = Depends(get_db_session)
 ):
     db_transaction = TransactionModel(
+        user_id=transaction.user_id,
         description=transaction.description,
         transaction_date=transaction.transaction_date,
         reference=transaction.reference,
@@ -63,10 +66,24 @@ def create_transaction(
     return db_transaction
 
 
+@router.get("/")
+def list_transactions(user_id: int, db: Session = Depends(get_db_session)):
+    transactions = db.query(TransactionModel).filter(
+        TransactionModel.user_id == user_id
+    )
+    return transactions.all()
+
+
 @router.get("/{transaction_id}")
-def read_transaction(transaction_id: int, db: Session = Depends(get_db_session)):
+def read_transaction(
+    transaction_id: int, user_id: int, db: Session = Depends(get_db_session)
+):
     db_tx = (
-        db.query(TransactionModel).filter(TransactionModel.id == transaction_id).first()
+        db.query(TransactionModel)
+        .filter(
+            TransactionModel.id == transaction_id, TransactionModel.user_id == user_id
+        )
+        .first()
     )
     if db_tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
@@ -76,11 +93,16 @@ def read_transaction(transaction_id: int, db: Session = Depends(get_db_session))
 @router.put("/{transaction_id}")
 def update_transaction(
     transaction_id: int,
+    user_id: int,
     transaction: TransactionUpdate,
     db: Session = Depends(get_db_session),
 ):
     db_tx = (
-        db.query(TransactionModel).filter(TransactionModel.id == transaction_id).first()
+        db.query(TransactionModel)
+        .filter(
+            TransactionModel.id == transaction_id, TransactionModel.user_id == user_id
+        )
+        .first()
     )
     if db_tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
@@ -108,9 +130,15 @@ def update_transaction(
 
 
 @router.delete("/transactions/{transaction_id}")
-def delete_transaction(transaction_id: int, db: Session = Depends(get_db_session)):
+def delete_transaction(
+    transaction_id: int, user_id: int, db: Session = Depends(get_db_session)
+):
     db_tx = (
-        db.query(TransactionModel).filter(TransactionModel.id == transaction_id).first()
+        db.query(TransactionModel)
+        .filter(
+            TransactionModel.id == transaction_id, TransactionModel.user_id == user_id
+        )
+        .first()
     )
     if db_tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")

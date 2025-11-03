@@ -6,37 +6,6 @@ This is a minimal double entry accounting system built with FastAPI and SQLAlche
 
 
 
-## Installation
-
-1. Clone the repository:
-   ```
-   git clone <repository-url>
-   cd accounting-service
-   ```
-
-2. Install the dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-To run the application, execute the following command:
-
-```
-uvicorn src.main:app --reload
-```
-
-The API will be available at `http://127.0.0.1:8000`.
-
-## Testing
-
-To run the tests, use the following command:
-
-```
-pytest
-```
-
 ## License
 
 This project is licensed under the MIT License.

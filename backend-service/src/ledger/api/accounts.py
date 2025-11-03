@@ -15,7 +15,7 @@ class AccountBaseRequest(BaseModel):
 
 
 class AccountCreateRequest(AccountBaseRequest):
-    pass
+    user_id: int
 
 
 class AccountUpdateRequest(AccountBaseRequest):
@@ -24,6 +24,7 @@ class AccountUpdateRequest(AccountBaseRequest):
 
 class AccountRequest(AccountBaseRequest):
     id: int
+    user_id: int
 
     class Config:
         from_attributes = True
@@ -33,7 +34,9 @@ class AccountRequest(AccountBaseRequest):
 def create_account(
     account: AccountCreateRequest, db: Session = Depends(get_db_session)
 ):
-    db_account = Account(name=account.name, balance=account.balance)
+    db_account = Account(
+        name=account.name, balance=account.balance, user_id=account.user_id
+    )
     db.add(db_account)
     try:
         db.commit()
@@ -42,19 +45,24 @@ def create_account(
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail="An account with this name already exists"
+            status_code=400,
+            detail="An account with this name already exists for this user",
         )
 
 
 @router.get("/")
-def list_accounts(db: Session = Depends(get_db_session)):
-    accounts = db.query(Account)
+def list_accounts(user_id: int, db: Session = Depends(get_db_session)):
+    accounts = db.query(Account).filter(Account.user_id == user_id)
     return accounts.all()
 
 
 @router.get("/{account_id}")
-def read_account(account_id: int, db: Session = Depends(get_db_session)):
-    account = db.query(Account).filter(Account.id == account_id).first()
+def read_account(account_id: int, user_id: int, db: Session = Depends(get_db_session)):
+    account = (
+        db.query(Account)
+        .filter(Account.id == account_id, Account.user_id == user_id)
+        .first()
+    )
     if account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     return account
@@ -63,10 +71,15 @@ def read_account(account_id: int, db: Session = Depends(get_db_session)):
 @router.put("/{account_id}")
 def update_account(
     account_id: int,
+    user_id: int,
     account: AccountUpdateRequest,
     db: Session = Depends(get_db_session),
 ):
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+    db_account = (
+        db.query(Account)
+        .filter(Account.id == account_id, Account.user_id == user_id)
+        .first()
+    )
     if db_account is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
@@ -79,8 +92,14 @@ def update_account(
 
 
 @router.delete("/{account_id}")
-def delete_account(account_id: int, db: Session = Depends(get_db_session)):
-    db_account = db.query(Account).filter(Account.id == account_id).first()
+def delete_account(
+    account_id: int, user_id: int, db: Session = Depends(get_db_session)
+):
+    db_account = (
+        db.query(Account)
+        .filter(Account.id == account_id, Account.user_id == user_id)
+        .first()
+    )
     if db_account is None:
         raise HTTPException(status_code=404, detail="Account not found")
     db.delete(db_account)

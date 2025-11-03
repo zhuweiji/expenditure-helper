@@ -22,6 +22,7 @@ class Statement(Base):
     __tablename__ = "statements"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     filename: Mapped[str] = mapped_column(String, index=True)
     saved_path: Mapped[str] = mapped_column(String)
     file_hash: Mapped[str] = mapped_column(String, index=True, unique=True)
@@ -32,6 +33,7 @@ class Statement(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     # Relationships
+    user: Mapped["User"] = relationship(back_populates="statements")  # type: ignore  # noqa: F821
     account: Mapped[Optional["Account"]] = relationship(back_populates="statements")  # type: ignore  # noqa: F821
     processing: Mapped[Optional["StatementProcessing"]] = relationship(
         back_populates="statement", uselist=False
