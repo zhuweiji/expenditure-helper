@@ -1,12 +1,12 @@
-import hashlib
-from datetime import datetime
+"""
+API endpoints for credit card statement processing.
+"""
+
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from src.common.logger import get_logger
-from src.common.project_paths import cc_statement_dir
 from src.database import get_db_session
 
 from ..models import ProcessingStatus, Statement, StatementProcessing
@@ -14,192 +14,31 @@ from ..repositories.statement_repository import (
     StatementProcessingRepository,
     StatementRepository,
 )
-from ..services.cc_statement_processor import CreditCardStatementProcessor
+from .background_tasks import process_statement_background
+from .statement_schemas import (
+    ProcessingDetailResponse,
+    ProcessingListResponse,
+    StatementDetailResponse,
+    StatementListResponse,
+    StatementProcessResponse,
+)
+from .statement_utilities import (
+    cleanup_file,
+    compute_file_hash,
+    filter_duplicate_file_uploads,
+    generate_safe_filename,
+    save_uploaded_file,
+    validate_pdf_file,
+)
 
 router = APIRouter()
-
 
 log = get_logger(__name__)
 
 
-class StatementProcessResponse(BaseModel):
-    """Response model for statement processing"""
-
-    id: int
-
-
-class StatementDetailResponse(BaseModel):
-    """Response model for statement detail"""
-
-    id: int
-    filename: str
-    saved_path: str
-    account_id: int | None
-    csv_output: str | None
-    created_at: str
-    file_hash: str
-
-    class Config:
-        from_attributes = True
-
-
-class StatementListResponse(BaseModel):
-    """Response model for statement list"""
-
-    id: int
-    filename: str
-    saved_path: str
-    account_id: int | None
-    created_at: str
-    file_hash: str
-
-    class Config:
-        from_attributes = True
-
-
-class ProcessingDetailResponse(BaseModel):
-    """Response model for statement processing detail"""
-
-    id: int
-    statement_id: int | None
-    status: str
-    error_message: str | None
-    created_at: str
-    started_at: str | None
-    completed_at: str | None
-
-    class Config:
-        from_attributes = True
-
-
-class ProcessingListResponse(BaseModel):
-    """Response model for statement processing list"""
-
-    id: int
-    statement_id: int | None
-    status: str
-    created_at: str
-    completed_at: str | None
-
-    class Config:
-        from_attributes = True
-
-
-def _compute_file_hash(content: bytes) -> str:
-    """
-    Compute SHA256 hash of file content.
-
-    Args:
-        content: The file content as bytes
-
-    Returns:
-        Hexadecimal string representation of the hash
-    """
-    return hashlib.sha256(content).hexdigest()
-
-
-def _validate_pdf_file(file: UploadFile) -> None:
-    """
-    Validate that the uploaded file is a PDF.
-
-    Args:
-        file: The uploaded file to validate
-
-    Raises:
-        HTTPException: If the file is not a PDF
-    """
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        log.warning(f"Invalid file type uploaded: {file.filename}")
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
-
-
-def _generate_safe_filename(original_filename: str) -> tuple[str, Path]:
-    """
-    Generate a unique, timestamped filename and full file path.
-
-    Args:
-        original_filename: The original filename from the upload
-
-    Returns:
-        Tuple of (safe_filename, full_file_path)
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_filename = f"{timestamp}_{original_filename}"
-    file_path = cc_statement_dir / safe_filename
-    return safe_filename, file_path
-
-
-async def _save_uploaded_file(file_data: bytes, file_path: Path) -> bytes:
-    """
-    Read and save the uploaded file to disk.
-
-    Args:
-        file: The uploaded file
-        file_path: Destination path for the file
-
-    Returns:
-        The file content as bytes
-    """
-    log.debug(f"Read {len(file_data)} bytes from uploaded file")
-
-    with open(file_path, "wb") as f:
-        f.write(file_data)
-
-    log.info(f"Successfully saved file to disk: {file_path.name}")
-    return file_data
-
-
-async def _process_pdf_with_ai(pdf_content: bytes, statement_id: int) -> str:
-    """
-    Process PDF content using AI to extract transaction data.
-
-    Args:
-        pdf_content: The PDF file content as bytes
-        statement_id: ID of the statement being processed
-
-    Returns:
-        CSV output from the processing
-    """
-    processor = CreditCardStatementProcessor()
-    log.debug(f"Initialized PDF processor for statement ID: {statement_id}")
-    csv_output = await processor.process_pdf_statement_async(pdf_content)
-    log.info(f"Successfully processed PDF statement (ID: {statement_id})")
-    return csv_output
-
-
-def _cleanup_file(file_path: Path | None) -> None:
-    """
-    Clean up the uploaded file if it exists.
-
-    Args:
-        file_path: Path to the file to delete
-    """
-    if file_path and file_path.exists():
-        file_path.unlink()
-        log.info(f"Cleaned up file after processing error: {file_path}")
-
-
-def _filter_duplicate_file_uploads(pdf_content: bytes, db: Session) -> int | None:
-    # Check for duplicate processing based on file hash
-    file_hash = _compute_file_hash(pdf_content)
-    log.info(f"Computed file hash: {file_hash}")
-
-    existing_statement = (
-        db.query(Statement).filter(Statement.file_hash == file_hash).first()
-    )
-
-    if existing_statement:
-        log.info(
-            f"Duplicate file detected. Existing statement: {existing_statement.id}"
-        )
-        assert existing_statement.processing is not None, (
-            "Processing record should exist for duplicate statement"
-        )
-        return existing_statement.processing.id
-
-
 @router.post("/upload", response_model=StatementProcessResponse)
 async def upload_and_process_statement(
+    user_id: int,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Credit card statement PDF file"),
     db: Session = Depends(get_db_session),
@@ -209,6 +48,7 @@ async def upload_and_process_statement(
     to extract transaction data as CSV.
 
     Args:
+        user_id: ID of the user uploading the statement
         background_tasks: FastAPI background tasks manager
         file: PDF file to upload
         db: Database session
@@ -216,10 +56,10 @@ async def upload_and_process_statement(
     Returns:
         StatementProcessResponse with the CSV output and file information
     """
-    log.info(f"Received upload request for file: {file.filename}")
+    log.info(f"Received upload request for file: {file.filename} from user: {user_id}")
 
     # Validate file type
-    _validate_pdf_file(file)
+    validate_pdf_file(file)
 
     # Initialize tracking variables
     file_path = None
@@ -231,46 +71,44 @@ async def upload_and_process_statement(
 
     file_data = await file.read()
 
-    if existing_processing_id := _filter_duplicate_file_uploads(file_data, db):
+    if existing_processing_id := filter_duplicate_file_uploads(file_data, user_id, db):
         return StatementProcessResponse(id=existing_processing_id)
 
     try:
-        # Generate safe filename and path
-        safe_filename, file_path = _generate_safe_filename(file.filename)
+        safe_filename, file_path = generate_safe_filename(file.filename)
         log.info(f"Saving file to: {file_path}")
 
         # Create database records
         statement = StatementRepository.create_statement(
             filename=file.filename,
             saved_path=str(file_path),
+            file_hash=compute_file_hash(file_data),
+            user_id=user_id,
             db=db,
-            file_hash=_compute_file_hash(file_data),
         )
         processing_record = StatementProcessingRepository.create_processing_record(
             statement_id=statement.id,
             db=db,
         )
-        log.info(f"Created statement record with ID: {statement.id}")
+        log.info(
+            f"Created statement record with ID: {statement.id} for user: {user_id}"
+        )
         log.info(f"Created processing record with ID: {processing_record.id}")
 
-        # Save file and get content
-        pdf_content = await _save_uploaded_file(file_data, file_path)
+        pdf_content = await save_uploaded_file(file_data, file_path)
 
-        # Update status to in progress
         StatementProcessingRepository.update_to_in_progress(processing_record, db)
         log.info(
             f"Queued processing for statement (ID: {processing_record.statement_id})"
         )
 
-        # Process the statement in the background
         background_tasks.add_task(
-            _process_statement_background,
+            process_statement_background,
             statement.id,
             processing_record.id,
             pdf_content,
         )
 
-        # Return response immediately
         return StatementProcessResponse(id=processing_record.id)
 
     except ValueError as e:
@@ -279,7 +117,7 @@ async def upload_and_process_statement(
             StatementProcessingRepository.update_to_errored(
                 processing_record, str(e), db
             )
-        _cleanup_file(file_path)
+        cleanup_file(file_path)
         raise HTTPException(status_code=500, detail=str(e))
 
     except Exception as e:
@@ -291,100 +129,45 @@ async def upload_and_process_statement(
             StatementProcessingRepository.update_to_errored(
                 processing_record, str(e), db
             )
-        _cleanup_file(file_path)
+        cleanup_file(file_path)
         raise HTTPException(
             status_code=500, detail=f"Error processing statement: {str(e)}"
         )
 
 
-async def _process_statement_background(
-    statement_id: int, processing_id: int, pdf_content: bytes
-):
-    """
-    Background task to process the statement PDF and update the database.
-
-    Args:
-        statement_id: ID of the statement
-        processing_id: ID of the processing record
-        pdf_content: The PDF file content as bytes
-    """
-    log.info(f"Background processing started for statement ID: {statement_id}")
-
-    # Create a new database session for the background task
-    db = next(get_db_session())
-
-    try:
-        # Process the PDF and extract CSV
-        csv_output = await _process_pdf_with_ai(pdf_content, statement_id)
-
-        # Update records with success
-        statement = db.query(Statement).filter(Statement.id == statement_id).first()
-        processing_record = (
-            db.query(StatementProcessing)
-            .filter(StatementProcessing.id == processing_id)
-            .first()
-        )
-
-        if statement and processing_record:
-            StatementRepository.update_statement_csv_output(statement, csv_output, db)
-            StatementProcessingRepository.update_to_completed(processing_record, db)
-            log.info(
-                f"Completed background processing for statement (ID: {statement_id})"
-            )
-        else:
-            log.warning(
-                f"Statement or processing record not found for ID: {statement_id}"
-            )
-
-    except Exception as e:
-        # Log and update the processing record with error
-        log.error(
-            f"Error in background processing of statement ID {statement_id}: {str(e)}",
-            exc_info=True,
-        )
-        processing_record = (
-            db.query(StatementProcessing)
-            .filter(StatementProcessing.id == processing_id)
-            .first()
-        )
-        if processing_record:
-            StatementProcessingRepository.update_to_errored(
-                processing_record, str(e), db
-            )
-
-    finally:
-        # Close the database session
-        db.close()
-
-
 @router.get("/", response_model=list[StatementListResponse])
 async def list_statements(
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db_session),
 ):
     """
-    Get a list of all statements.
+    Get a list of all statements for a specific user.
 
     Args:
+        user_id: ID of the user whose statements to retrieve
         skip: Number of records to skip (for pagination)
         limit: Maximum number of records to return
         db: Database session
 
     Returns:
-        List of statements
+        List of statements for the user
     """
-    log.info(f"Fetching statements list (skip={skip}, limit={limit})")
+    log.info(
+        f"Fetching statements list for user {user_id} (skip={skip}, limit={limit})"
+    )
 
     statements = (
         db.query(Statement)
+        .filter(Statement.user_id == user_id)
         .order_by(Statement.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
 
-    log.info(f"Retrieved {len(statements)} statements")
+    log.info(f"Retrieved {len(statements)} statements for user {user_id}")
 
     return [
         StatementListResponse(
@@ -401,28 +184,34 @@ async def list_statements(
 
 @router.get("/processing", response_model=list[ProcessingListResponse])
 async def list_processing_records(
+    user_id: int,
     skip: int = 0,
     limit: int = 100,
     status: str | None = None,
     db: Session = Depends(get_db_session),
 ):
     """
-    Get a list of all statement processing records.
+    Get a list of all statement processing records for a specific user.
 
     Args:
+        user_id: ID of the user whose processing records to retrieve
         skip: Number of records to skip (for pagination)
         limit: Maximum number of records to return
         status: Optional filter by processing status
         db: Database session
 
     Returns:
-        List of processing records
+        List of processing records for the user
     """
     log.info(
-        f"Fetching processing records list (skip={skip}, limit={limit}, status={status})"
+        f"Fetching processing records list for user {user_id} (skip={skip}, limit={limit}, status={status})"
     )
 
-    query = db.query(StatementProcessing)
+    query = (
+        db.query(StatementProcessing)
+        .join(Statement)
+        .filter(Statement.user_id == user_id)
+    )
 
     if status:
         try:
@@ -443,7 +232,9 @@ async def list_processing_records(
         .all()
     )
 
-    log.info(f"Retrieved {len(processing_records)} processing records")
+    log.info(
+        f"Retrieved {len(processing_records)} processing records for user {user_id}"
+    )
 
     return [
         ProcessingListResponse(
@@ -462,6 +253,7 @@ async def list_processing_records(
 @router.get("/{statement_id}", response_model=StatementDetailResponse)
 async def get_statement_detail(
     statement_id: int,
+    user_id: int,
     db: Session = Depends(get_db_session),
 ):
     """
@@ -469,6 +261,7 @@ async def get_statement_detail(
 
     Args:
         statement_id: ID of the statement to retrieve
+        user_id: ID of the user requesting the statement
         db: Database session
 
     Returns:
@@ -476,7 +269,11 @@ async def get_statement_detail(
     """
     log.info(f"Fetching statement detail for ID: {statement_id}")
 
-    statement = db.query(Statement).filter(Statement.id == statement_id).first()
+    statement = (
+        db.query(Statement)
+        .filter(Statement.id == statement_id, Statement.user_id == user_id)
+        .first()
+    )
 
     if not statement:
         log.warning(f"Statement not found: {statement_id}")
@@ -498,6 +295,7 @@ async def get_statement_detail(
 @router.get("/processing/{processing_id}", response_model=ProcessingDetailResponse)
 async def get_processing_detail(
     processing_id: int,
+    user_id: int,
     db: Session = Depends(get_db_session),
 ):
     """
@@ -505,6 +303,7 @@ async def get_processing_detail(
 
     Args:
         processing_id: ID of the processing record to retrieve
+        user_id: ID of the user requesting the processing record
         db: Database session
 
     Returns:
@@ -514,7 +313,8 @@ async def get_processing_detail(
 
     processing = (
         db.query(StatementProcessing)
-        .filter(StatementProcessing.id == processing_id)
+        .join(Statement)
+        .filter(StatementProcessing.id == processing_id, Statement.user_id == user_id)
         .first()
     )
 
@@ -542,6 +342,7 @@ async def get_processing_detail(
 @router.delete("/{statement_id}")
 async def delete_statement(
     statement_id: int,
+    user_id: int,
     db: Session = Depends(get_db_session),
 ):
     """
@@ -550,6 +351,7 @@ async def delete_statement(
 
     Args:
         statement_id: ID of the statement to delete
+        user_id: ID of the user requesting the deletion
         db: Database session
 
     Returns:
@@ -557,7 +359,11 @@ async def delete_statement(
     """
     log.info(f"Attempting to delete statement ID: {statement_id}")
 
-    statement = db.query(Statement).filter(Statement.id == statement_id).first()
+    statement = (
+        db.query(Statement)
+        .filter(Statement.id == statement_id, Statement.user_id == user_id)
+        .first()
+    )
 
     if not statement:
         log.warning(f"Statement not found: {statement_id}")
@@ -587,6 +393,7 @@ async def delete_statement(
 @router.delete("/processing/{processing_id}")
 async def delete_processing_record(
     processing_id: int,
+    user_id: int,
     db: Session = Depends(get_db_session),
 ):
     """
@@ -594,6 +401,7 @@ async def delete_processing_record(
 
     Args:
         processing_id: ID of the processing record to delete
+        user_id: ID of the user requesting the deletion
         db: Database session
 
     Returns:
@@ -603,7 +411,8 @@ async def delete_processing_record(
 
     processing = (
         db.query(StatementProcessing)
-        .filter(StatementProcessing.id == processing_id)
+        .join(Statement)
+        .filter(StatementProcessing.id == processing_id, Statement.user_id == user_id)
         .first()
     )
 

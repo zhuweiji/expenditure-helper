@@ -10,7 +10,7 @@ class StatementRepository:
 
     @staticmethod
     def create_statement(
-        filename: str, saved_path: str, file_hash: str, db: Session
+        filename: str, saved_path: str, file_hash: str, user_id: int, db: Session
     ) -> Statement:
         """
         Create and persist a new statement record in the database.
@@ -19,6 +19,7 @@ class StatementRepository:
             filename: Original filename of the statement
             saved_path: Path where the file is saved
             file_hash: SHA256 hash of the file content
+            user_id: ID of the user who owns this statement
             db: Database session
 
         Returns:
@@ -28,6 +29,7 @@ class StatementRepository:
             filename=filename,
             saved_path=saved_path,
             file_hash=file_hash,
+            user_id=user_id,
             created_at=datetime.utcnow(),
         )
         db.add(statement)

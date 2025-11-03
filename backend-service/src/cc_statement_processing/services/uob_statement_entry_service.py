@@ -18,6 +18,7 @@ class UOBStatementEntryService:
     def __init__(
         self,
         db: Session,
+        user_id: int,
         credit_card_account_id: int,
         default_expense_account_id: int,
         bank_account_id: Optional[int] = None,
@@ -27,11 +28,13 @@ class UOBStatementEntryService:
 
         Args:
             db: Database session
+            user_id: ID of the user who owns the transactions
             credit_card_account_id: Account ID for the credit card liability account
             default_expense_account_id: Default account ID for expenses when category is not specified
             bank_account_id: Optional account ID for bank account (used for payments/refunds)
         """
         self.db = db
+        self.user_id = user_id
         self.credit_card_account_id = credit_card_account_id
         self.default_expense_account_id = default_expense_account_id
         self.bank_account_id = bank_account_id
@@ -132,6 +135,7 @@ class UOBStatementEntryService:
 
         # Create the transaction
         transaction = Transaction(
+            user_id=self.user_id,
             description=txn_data["description"],
             transaction_date=txn_data["date"],
             reference=None,
@@ -182,6 +186,7 @@ class UOBStatementEntryService:
 
         # Create the transaction
         transaction = Transaction(
+            user_id=self.user_id,
             description=txn_data["description"],
             transaction_date=txn_data["date"],
             reference=None,
