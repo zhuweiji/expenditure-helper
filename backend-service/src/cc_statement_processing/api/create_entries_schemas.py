@@ -15,11 +15,11 @@ class CreateEntriesRequest(BaseModel):
 
     statement_id: int = Field(..., description="ID of the statement to process")
     user_id: int = Field(..., description="ID of the user performing the operation")
-    credit_card_account_id: int = Field(
-        ..., description="Account ID for the credit card liability account"
+    credit_card_account_id: Optional[int] = Field(
+        None, description="Account ID for the credit card liability account"
     )
-    default_expense_account_id: int = Field(
-        ...,
+    default_expense_account_id: Optional[int] = Field(
+        None,
         description="Default account ID for expenses when category is not specified",
     )
     bank_account_id: Optional[int] = Field(

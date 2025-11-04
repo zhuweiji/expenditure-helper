@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import List, Optional
 
 from fastapi import HTTPException
@@ -5,6 +6,7 @@ from sqlalchemy.orm import Session
 from src.common.logger import get_logger
 from src.ledger.models.account import Account
 from src.ledger.models.transaction import Transaction
+from src.ledger.services.user_service import get_default_accounts
 
 from .create_entries_schemas import (
     CreateEntriesRequest,
@@ -35,9 +37,19 @@ def _get_account_by_id(account_id: int, db: Session) -> Account:
     return account
 
 
-def _validate_accounts(request: CreateEntriesRequest, db: Session) -> None:
+@dataclass
+class RequiredCCStatementAccounts:
+    credit_card_account: Account
+    default_expense_account: Account
+    bank_account: Optional[Account]
+
+
+def resolve_user_accounts(
+    request: CreateEntriesRequest, db: Session
+) -> RequiredCCStatementAccounts:
     """
-    Validate that all account IDs in the request exist and belong to the user.
+    If account ids are provided: validate that all account IDs in the request exist and belong to the user
+    If there are missing account ids: then use default accounts for the user
 
     Args:
         request: The create entries request
@@ -46,15 +58,37 @@ def _validate_accounts(request: CreateEntriesRequest, db: Session) -> None:
     Raises:
         HTTPException: If any account is not found or doesn't belong to the user
     """
+    default_accounts = get_default_accounts(request.user_id, db)
+
     # Validate required accounts
-    credit_card_account = _get_account_by_id(request.credit_card_account_id, db)
+    credit_card_account_id = (
+        request.credit_card_account_id or default_accounts.credit_card_account_id
+    )
+    if credit_card_account_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Credit card account ID is required but not provided and no default found",
+        )
+
+    credit_card_account = _get_account_by_id(credit_card_account_id, db)
     if credit_card_account.user_id != request.user_id:
         raise HTTPException(
             status_code=403,
             detail=f"Account {request.credit_card_account_id} does not belong to user {request.user_id}",
         )
 
-    default_expense_account = _get_account_by_id(request.default_expense_account_id, db)
+    default_expense_account_id = (
+        request.default_expense_account_id
+        or default_accounts.default_expense_account_id
+    )
+
+    if default_expense_account_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Default expense account ID is required but not provided and no default found",
+        )
+
+    default_expense_account = _get_account_by_id(default_expense_account_id, db)
     if default_expense_account.user_id != request.user_id:
         raise HTTPException(
             status_code=403,
@@ -62,6 +96,7 @@ def _validate_accounts(request: CreateEntriesRequest, db: Session) -> None:
         )
 
     # Validate optional bank account
+    bank_account = None
     if request.bank_account_id is not None:
         bank_account = _get_account_by_id(request.bank_account_id, db)
         if bank_account.user_id != request.user_id:
@@ -78,6 +113,12 @@ def _validate_accounts(request: CreateEntriesRequest, db: Session) -> None:
                 status_code=403,
                 detail=f"Account {mapping.account_id} does not belong to user {request.user_id}",
             )
+
+    return RequiredCCStatementAccounts(
+        credit_card_account=credit_card_account,
+        default_expense_account=default_expense_account,
+        bank_account=bank_account,
+    )
 
 
 def _build_transaction_previews(

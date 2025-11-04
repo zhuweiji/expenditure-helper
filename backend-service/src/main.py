@@ -17,7 +17,11 @@ app.include_router(accounts.router, prefix="/accounts", tags=["accounts"])
 app.include_router(entries.router, prefix="/entries", tags=["entries"])
 app.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 app.include_router(statement_apis.router, prefix="/statements", tags=["statements"])
-app.include_router(create_entries_api.router, prefix="/api", tags=["statement-entries"])
+app.include_router(
+    create_entries_api.router,
+    prefix="/import-ledger-entries",
+    tags=["import-ledger-entries"],
+)
 
 
 @app.get("/")

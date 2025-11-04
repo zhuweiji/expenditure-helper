@@ -2,6 +2,7 @@
 User service for creating default accounts and other user-related operations.
 """
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -136,3 +137,28 @@ def calculate_net_worth(db: Session, user_id: int) -> Decimal:
     )
 
     return Decimal(str(assets)) - Decimal(str(liabilities))
+
+
+@dataclass
+class DefaultAccounts:
+    credit_card_account_id: int | None
+    bank_account_id: int | None
+    default_expense_account_id: int | None
+
+
+def get_default_accounts(user_id: int, db: Session) -> DefaultAccounts:
+    """
+    Find default accounts by conventional names.
+    """
+    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+
+    # Find by name conventions
+    credit_card = next((a for a in accounts if a.name == "Credit Card"), None)
+    bank = next((a for a in accounts if a.name == "Bank Account"), None)
+    expense = next((a for a in accounts if a.name == "General Expenses"), None)
+
+    return DefaultAccounts(
+        credit_card_account_id=credit_card.id if credit_card else None,
+        bank_account_id=bank.id if bank else None,
+        default_expense_account_id=expense.id if expense else None,
+    )
