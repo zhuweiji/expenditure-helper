@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.database import get_db_session
 
 from ..models.user import User
-from ..services.user_service import create_default_accounts_for_user
+from ..services.user_account_service import create_default_accounts_for_user
 
 router = APIRouter()
 
@@ -35,6 +35,25 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+@router.get("/", response_model=list[UserResponse])
+def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    is_active: Optional[bool] = True,
+    db: Session = Depends(get_db_session),
+):
+    """
+    List all users with optional filtering by active status.
+    """
+    query = db.query(User)
+
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+
+    users = query.offset(skip).limit(limit).all()
+    return users
 
 
 @router.post("/", response_model=UserResponse, status_code=201)
@@ -74,25 +93,6 @@ def create_user(user: UserCreateRequest, db: Session = Depends(get_db_session)):
             raise HTTPException(status_code=400, detail="Email already exists")
         else:
             raise HTTPException(status_code=400, detail="Failed to create user")
-
-
-@router.get("/", response_model=list[UserResponse])
-def list_users(
-    skip: int = 0,
-    limit: int = 100,
-    is_active: Optional[bool] = None,
-    db: Session = Depends(get_db_session),
-):
-    """
-    List all users with optional filtering by active status.
-    """
-    query = db.query(User)
-
-    if is_active is not None:
-        query = query.filter(User.is_active == is_active)
-
-    users = query.offset(skip).limit(limit).all()
-    return users
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -160,43 +160,3 @@ def delete_user(user_id: int, db: Session = Depends(get_db_session)):
     db.delete(db_user)
     db.commit()
     return None
-
-
-@router.get("/{user_id}/accounts")
-def get_user_accounts(user_id: int, db: Session = Depends(get_db_session)):
-    """
-    Get all accounts belonging to a specific user.
-    """
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return user.accounts
-
-
-@router.get("/{user_id}/stats")
-def get_user_stats(user_id: int, db: Session = Depends(get_db_session)):
-    """
-    Get statistics for a user including account counts and transaction counts.
-    """
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "user_id": user.id,
-        "username": user.username,
-        "total_accounts": len(user.accounts),
-        "total_transactions": len(user.transactions),
-        "total_statements": len(user.statements),
-        "accounts_by_type": _count_accounts_by_type(user.accounts),
-    }
-
-
-def _count_accounts_by_type(accounts):
-    """Helper function to count accounts by type"""
-    counts = {}
-    for account in accounts:
-        account_type = account.account_type or "unspecified"
-        counts[account_type] = counts.get(account_type, 0) + 1
-    return counts

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from src.database import get_db_session
 
 from ..models.account import Account
+from ..models.entry import Entry
 
 router = APIRouter()
 
@@ -28,12 +29,6 @@ class AccountRequest(AccountBaseRequest):
 
     class Config:
         from_attributes = True
-
-
-@router.get("/{user_id}")
-def list_accounts(user_id: int, db: Session = Depends(get_db_session)):
-    accounts = db.query(Account).filter(Account.user_id == user_id)
-    return accounts.all()
 
 
 @router.post("/")
@@ -105,3 +100,29 @@ def delete_account(
     db.delete(db_account)
     db.commit()
     return db_account
+
+
+@router.delete("/user/{user_id}/clear")
+def clear_all_accounts(user_id: int, db: Session = Depends(get_db_session)):
+    """Clear all entries from all accounts for a specific user"""
+    # Get all account IDs for the user
+    account_ids = db.query(Account.id).filter(Account.user_id == user_id).all()
+    account_ids_list = [aid[0] for aid in account_ids]
+
+    if not account_ids_list:
+        return {
+            "deleted_count": 0,
+            "message": f"No accounts found for user {user_id}",
+        }
+
+    # Delete all entries associated with those accounts
+    deleted_count = (
+        db.query(Entry)
+        .filter(Entry.account_id.in_(account_ids_list))
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {
+        "deleted_count": deleted_count,
+        "message": f"Cleared {deleted_count} entry(entries) from accounts for user {user_id}",
+    }

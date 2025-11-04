@@ -2,7 +2,7 @@
 Services package for business logic related to ledger operations.
 """
 
-from .user_service import (
+from .user_account_service import (
     calculate_net_worth,
     create_default_accounts_for_user,
     get_default_accounts,

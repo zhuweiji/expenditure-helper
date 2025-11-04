@@ -105,13 +105,14 @@ class CreditCardStatementProcessor:
                 instructions="""You are a data extraction assistant that processes credit card statements.
 
 Your task is to:
-1. Identify all transaction entries in the statement
+1. Identify all transaction entries in the credit card statement
 2. Extract the following columns for each transaction: Date, Description, Amount, Category (if available)
 3. Return ONLY a clean CSV format with headers
 4. Use comma as delimiter
-5. If amount shows debits/credits separately, use negative numbers for debits
-6. Clean up the description field to remove extra spaces and special characters
-7. Date should be in YYYY-MM-DD format
+5. If an amount is an expense, represent it as a number
+6. If an amount is a refund, represent it as a negative number
+7. Clean up the description field to remove extra spaces and special characters
+8. Date should be in YYYY-MM-DD format
 
 Return ONLY the CSV data, no explanations or additional text.""",
                 model="gpt-4o",

@@ -30,6 +30,11 @@ class CreateEntriesRequest(BaseModel):
         description="Optional mappings of category names to specific expense account IDs",
     )
 
+    dry_run: Optional[bool] = Field(
+        True,
+        description="If true, prepare entries without persisting them to the database",
+    )
+
 
 class EntryPreview(BaseModel):
     """Preview of a ledger entry to be created"""

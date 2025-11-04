@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.common.logger import get_logger
 from src.ledger.models.account import Account
 from src.ledger.models.transaction import Transaction
-from src.ledger.services.user_service import get_default_accounts
+from src.ledger.services.user_account_service import get_default_accounts
 
 from .create_entries_schemas import (
     CreateEntriesRequest,

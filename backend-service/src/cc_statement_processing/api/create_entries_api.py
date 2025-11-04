@@ -22,7 +22,7 @@ router = APIRouter()
 log = get_logger(__name__)
 
 
-@router.post("/prepare-entries", response_model=PrepareEntriesResponse)
+@router.post("/create-entries", response_model=PrepareEntriesResponse)
 def prepare_entries_from_statement(
     request: CreateEntriesRequest,
     db: Session = Depends(get_db_session),
@@ -128,12 +128,14 @@ def prepare_entries_from_statement(
             is_balanced=is_balanced,
         )
 
-        # Rollback the nested transaction
-        db.rollback()
-
         log.info(
             f"Prepared {len(transactions)} transactions for statement {statement_id}"
         )
+
+        # Rollback the nested transaction
+        if request.dry_run:
+            db.rollback()
+
         return response
 
     except Exception as e:
