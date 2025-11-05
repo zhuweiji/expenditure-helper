@@ -1,17 +1,114 @@
+import { useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { TransactionCard } from '../components/TransactionCard';
 import { FloatingActionButton } from '../components/FloatingActionButton';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { mockTransactions, mockCategorySpending } from '../lib/mockData';
+import { apiClient, getCurrentUserId, shouldUseMockData } from '../lib/api';
 
 export function Home() {
-  const recentTransactions = mockTransactions.slice(0, 5);
-  const totalIncome = mockTransactions
-    .filter((t) => t.type === 'credit')
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [categorySpending, setCategorySpending] = useState<typeof mockCategorySpending>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const userId = getCurrentUserId();
+    const useMockData = shouldUseMockData(userId);
+
+    if (!userId) {
+      // No user set - initialize with empty state
+      console.warn('No user id found in localStorage. Set `userId` in localStorage to fetch transactions.');
+      setRecentTransactions([]);
+      setCategorySpending([]);
+      return;
+    }
+
+    if (useMockData) {
+      // Use mock data
+      setRecentTransactions(mockTransactions.slice(0, 20));
+      setCategorySpending(mockCategorySpending.slice(0, 4));
+      return;
+    }
+
+    let mounted = true;
+
+    async function fetchTransactions() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = (await apiClient.getTransactions(userId as number, {
+          page: 1,
+          pageSize: 20,
+        })) as any;
+
+        console.log('Home transactions response:', response);
+
+        // Handle paginated response
+        const data = response.transactions || response;
+
+        // Map backend transaction shape to match Transaction interface
+        const mapped = (data || []).map((tx: any) => ({
+          id: tx.id,
+          description: tx.description,
+          transaction_date: tx.transaction_date,
+          reference: tx.reference,
+          amount: Number(tx.amount),
+          entries: tx.entries || [],
+          detailed_entries: tx.detailed_entries || [],
+        }));
+
+        if (mounted) {
+          setRecentTransactions(mapped.length ? mapped : []);
+          // For category spending on home page, aggregate from transactions
+          const categoryMap = new Map<string, number>();
+          mapped.forEach((tx: any) => {
+            tx.entries?.forEach((entry: any) => {
+              const name = entry.account_name || 'Other';
+              categoryMap.set(name, (categoryMap.get(name) || 0) + Math.abs(Number(tx.amount)));
+            });
+          });
+          
+          // Convert to array and sort by amount
+          const categories = Array.from(categoryMap.entries())
+            .map(([category, amount]) => ({
+              category,
+              amount,
+              percentage: 0,
+              color: '#3b82f6',
+            }))
+            .sort((a, b) => b.amount - a.amount)
+            .slice(0, 4);
+
+          // Calculate percentages
+          const maxAmount = Math.max(...categories.map(c => c.amount), 1);
+          categories.forEach(c => {
+            c.percentage = (c.amount / maxAmount) * 100;
+          });
+
+          setCategorySpending(categories);
+        }
+      } catch (err: any) {
+        console.error('Failed to fetch transactions', err);
+        if (mounted) setError(err?.message || 'Failed to fetch transactions');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    fetchTransactions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const totalIncome = recentTransactions
+    .filter((t) => t.amount >= 0)
     .reduce((sum, t) => sum + t.amount, 0);
   const totalExpenses = Math.abs(
-    mockTransactions
-      .filter((t) => t.type === 'debit')
+    recentTransactions
+      .filter((t) => t.amount < 0)
       .reduce((sum, t) => sum + t.amount, 0)
   );
   const netBalance = totalIncome - totalExpenses;
@@ -72,27 +169,31 @@ export function Home() {
             Top Spending Categories
           </h3>
           <div className="space-y-4">
-            {mockCategorySpending.slice(0, 4).map((category) => (
-              <div key={category.category}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-primary">
-                    {category.category}
-                  </span>
-                  <span className="text-sm font-semibold text-primary">
-                    ${category.amount.toFixed(2)}
-                  </span>
+            {categorySpending.length > 0 ? (
+              categorySpending.map((category) => (
+                <div key={category.category}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-primary">
+                      {category.category}
+                    </span>
+                    <span className="text-sm font-semibold text-primary">
+                      ${category.amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-background rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all"
+                      style={{
+                        width: `${category.percentage}%`,
+                        backgroundColor: category.color,
+                      }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full bg-background rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all"
-                    style={{
-                      width: `${category.percentage}%`,
-                      backgroundColor: category.color,
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-secondary text-sm">No spending data available</p>
+            )}
           </div>
         </div>
 
@@ -107,9 +208,23 @@ export function Home() {
             </a>
           </div>
           <div className="space-y-3">
-            {recentTransactions.map((transaction) => (
-              <TransactionCard key={transaction.id} transaction={transaction} />
-            ))}
+            {loading ? (
+              <div className="card text-center py-8">
+                <p className="text-secondary">Loading transactions...</p>
+              </div>
+            ) : error ? (
+              <div className="card text-center py-8">
+                <p className="text-error">{error}</p>
+              </div>
+            ) : recentTransactions.length > 0 ? (
+              recentTransactions.map((transaction) => (
+                <TransactionCard key={transaction.id} transaction={transaction} />
+              ))
+            ) : (
+              <div className="card text-center py-8">
+                <p className="text-secondary">No transactions found</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

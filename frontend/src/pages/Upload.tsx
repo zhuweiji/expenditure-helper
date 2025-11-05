@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
 import { UploadZone } from '../components/UploadZone';
 import { ArrowLeft } from 'lucide-react';
+import { apiClient, getCurrentUserId, type ApiError } from '../lib/api';
 
 export function Upload() {
   const navigate = useNavigate();
@@ -15,15 +16,21 @@ export function Upload() {
     setUploadError('');
 
     try {
-      // Mock upload - in production, call apiClient.uploadStatement(file)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const userId = getCurrentUserId();
+      if (!userId) {
+        setUploadError('You must be logged in to upload statements.');
+        return;
+      }
+
+      await apiClient.uploadStatement(file, userId);
       
       setUploadSuccess(true);
       setTimeout(() => {
         navigate('/transactions');
       }, 2000);
     } catch (error) {
-      setUploadError('Failed to upload file. Please try again.');
+      const apiError = error as ApiError;
+      setUploadError(apiError.message || 'Failed to upload file. Please try again.');
     } finally {
       setIsUploading(false);
     }

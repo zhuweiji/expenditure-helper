@@ -6,6 +6,9 @@ import autoprefixer from 'autoprefixer'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    allowedHosts: ['expenses.zhuhome.work'],
+  },
   css: {
     postcss: {
       plugins: [

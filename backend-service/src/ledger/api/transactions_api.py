@@ -2,38 +2,18 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from src.database import get_db_session
 
-from ..api.entries import Entry, EntryCreate
+from ..models.account import Account
 from ..models.entry import Entry as EntryModel
 from ..models.transaction import Transaction as TransactionModel
-
-
-class TransactionBase(BaseModel):
-    description: str
-    transaction_date: datetime
-    reference: Optional[str] = None
-
-
-class TransactionCreate(TransactionBase):
-    user_id: int
-    entries: List[EntryCreate] = []
-
-
-class TransactionUpdate(TransactionBase):
-    entries: Optional[List[EntryCreate]] = None
-
-
-class Transaction(TransactionBase):
-    id: int
-    user_id: int
-    entries: List[Entry] = []
-
-    class Config:
-        from_attributes = True
-
+from .transactions_schemas import (
+    PaginatedTransactionResponse,
+    Transaction,
+    TransactionCreate,
+    TransactionUpdate,
+)
 
 router = APIRouter()
 
@@ -67,11 +47,87 @@ def create_transaction(
 
 
 @router.get("/")
-def list_transactions(user_id: int, db: Session = Depends(get_db_session)):
-    transactions = db.query(TransactionModel).filter(
-        TransactionModel.user_id == user_id
+def list_transactions(
+    user_id: int,
+    startDate: Optional[str] = None,
+    endDate: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 1000,
+    db: Session = Depends(get_db_session),
+):
+    # Build query with filters
+    query = db.query(TransactionModel).filter(TransactionModel.user_id == user_id)
+
+    # Apply date filters if provided
+    if startDate:
+        start_datetime = datetime.fromisoformat(startDate.replace("Z", "+00:00"))
+        query = query.filter(TransactionModel.transaction_date >= start_datetime)
+
+    if endDate:
+        end_datetime = datetime.fromisoformat(endDate.replace("Z", "+00:00"))
+        query = query.filter(TransactionModel.transaction_date <= end_datetime)
+
+    # Get total count before pagination
+    total_count = query.count()
+
+    # Apply sorting and pagination
+    transactions = (
+        query.order_by(TransactionModel.transaction_date.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
     )
-    return transactions.all()
+
+    # Enrich transaction data with account information and calculate totals
+    result_transactions = []
+    for tx in transactions:
+        tx_data = {
+            "id": tx.id,
+            "user_id": tx.user_id,
+            "description": tx.description,
+            "transaction_date": tx.transaction_date,
+            "reference": tx.reference,
+            "entries": [],
+            "detailed_entries": [],
+            "amount": 0.0,
+        }
+
+        # Process all entries
+        for entry in tx.entries:
+            account = db.query(Account).get(entry.account_id)
+            if not account:
+                continue
+
+            entry_data = {
+                "account_name": account.name,
+                "account_type": account.account_type,
+                "amount": float(entry.amount),
+                "entry_type": entry.entry_type,
+                "description": entry.description,
+            }
+
+            # Add to detailed entries list
+            tx_data["detailed_entries"].append(entry_data)
+
+            # For main view, only show user accounts and use them for total amount
+            if account.account_type == "user":
+                tx_data["entries"].append(entry_data)
+                # For total amount, use the first user account entry
+                if tx_data["amount"] == 0.0:
+                    tx_data["amount"] = float(entry.amount)
+
+        result_transactions.append(Transaction(**tx_data))
+
+    # Calculate pagination info
+    total_pages = (total_count + page_size - 1) // page_size
+
+    return PaginatedTransactionResponse(
+        transactions=result_transactions,
+        total_count=total_count,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/{transaction_id}")
@@ -140,6 +196,11 @@ def delete_transaction(
         )
         .first()
     )
+    if db_tx is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    db.delete(db_tx)
+    db.commit()
+    return {"detail": "Transaction deleted"}
     if db_tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(db_tx)

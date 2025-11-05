@@ -1,31 +1,55 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
+import { apiClient, type ApiError } from '../lib/api';
 
 export function Signup() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
     setIsLoading(true);
 
-    // Mock signup - in production, call apiClient.signup(email, password, name)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Create user with username, email, and full name
+      // Passwords are not implemented in the backend yet
+      const user = await apiClient.createUser(
+        username || email, // Use username if provided, otherwise use email
+        email,
+        name || undefined
+      );
+      
+      // Store user info in localStorage
       localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userId', user.id.toString());
+      localStorage.setItem('username', user.username);
+      localStorage.setItem('userEmail', user.email);
+      
       navigate('/');
-    }, 1000);
+    } catch (err) {
+      const apiError = err as ApiError;
+      if (apiError.status === 400) {
+        setError('Username or email already exists. Please try a different one.');
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,12 +64,36 @@ export function Signup() {
 
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+            
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-primary mb-2"
+              >
+                Username
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="input w-full"
+                placeholder="johndoe"
+                required
+              />
+            </div>
+
             <div>
               <label
                 htmlFor="name"
                 className="block text-sm font-medium text-primary mb-2"
               >
-                Name
+                Full Name
               </label>
               <input
                 id="name"
@@ -54,7 +102,6 @@ export function Signup() {
                 onChange={(e) => setName(e.target.value)}
                 className="input w-full"
                 placeholder="John Doe"
-                required
               />
             </div>
 
@@ -90,9 +137,12 @@ export function Signup() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="input w-full"
                 placeholder="••••••••"
-                required
+                disabled
                 minLength={8}
               />
+              <p className="text-xs text-secondary mt-1">
+                Password functionality coming soon.
+              </p>
             </div>
 
             <div>
@@ -109,7 +159,7 @@ export function Signup() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="input w-full"
                 placeholder="••••••••"
-                required
+                disabled
                 minLength={8}
               />
             </div>

@@ -1,9 +1,46 @@
 // API Configuration and Service Layer
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { ENABLE_MOCK_DATA, TEST_USER_ID } from './config';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9110';
 
 export interface ApiError {
   message: string;
   status: number;
+}
+
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Helper function to get current user ID from localStorage
+export function getCurrentUserId(): number | null {
+  const userId = localStorage.getItem('userId');
+  return userId ? parseInt(userId, 10) : null;
+}
+
+/**
+ * Determines if mock data should be used for the current user.
+ * Mock data is used if:
+ * - ENABLE_MOCK_DATA feature flag is true, OR
+ * - The current user ID matches TEST_USER_ID (test user has access to mock data)
+ */
+export function shouldUseMockData(userId: number | null): boolean {
+  if (ENABLE_MOCK_DATA) {
+    console.log('This version has mock data enabled via feature flag.');
+    return true;
+  }
+  
+  if (TEST_USER_ID !== null && userId === TEST_USER_ID) {
+    console.log('This is a test user with access to mock data.');
+    return true;
+  }
+  
+  return false;
 }
 
 class ApiClient {
@@ -47,46 +84,63 @@ class ApiClient {
     }
   }
 
-  // Auth endpoints
-  async login(email: string, password: string) {
-    return this.request('/auth/login', {
+  // Auth endpoints (using user management since passwords are not implemented)
+  async getUserByUsername(username: string): Promise<User> {
+    return this.request<User>(`/users/username/${username}`);
+  }
+
+  async createUser(username: string, email: string, fullName?: string): Promise<User> {
+    return this.request<User>('/users', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ 
+        username, 
+        email, 
+        full_name: fullName 
+      }),
     });
   }
 
-  async signup(email: string, password: string, name: string) {
-    return this.request('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, name }),
-    });
+  async listUsers(): Promise<User[]> {
+    return this.request<User[]>('/users');
   }
 
   // Transaction endpoints
-  async getTransactions(params?: { startDate?: string; endDate?: string }) {
-    const queryString = params
-      ? '?' + new URLSearchParams(params as Record<string, string>).toString()
-      : '';
-    return this.request(`/transactions${queryString}`);
+  async getTransactions(
+    userId: number,
+    params?: {
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const queryParams = new URLSearchParams({ user_id: userId.toString() });
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString());
+
+    console.log(userId)
+    return this.request(`/transactions?${queryParams.toString()}`);
   }
 
-  async getTransaction(id: string) {
-    return this.request(`/transactions/${id}`);
+  async getTransaction(id: string, userId: number) {
+    return this.request(`/transactions/${id}?user_id=${userId}`);
   }
 
-  async createTransaction(data: any) {
+  async createTransaction(userId: number, data: any) {
     return this.request('/transactions', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, user_id: userId }),
     });
   }
 
   // Statement upload
-  async uploadStatement(file: File) {
+  async uploadStatement(file: File, userId: number) {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${this.baseUrl}/statements/upload`, {
+    const response = await fetch(`${this.baseUrl}/statements/upload?user_id=${userId}`, {
       method: 'POST',
       body: formData,
     });
@@ -102,20 +156,65 @@ class ApiClient {
   }
 
   // Analytics endpoints
-  async getAnalytics(params?: { startDate?: string; endDate?: string }) {
-    const queryString = params
-      ? '?' + new URLSearchParams(params as Record<string, string>).toString()
-      : '';
-    return this.request(`/analytics${queryString}`);
+  async getAnalytics(userId: number, params?: { startDate?: string; endDate?: string }) {
+    const queryParams = new URLSearchParams({ user_id: userId.toString() });
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    
+    return this.request(`/analytics?${queryParams.toString()}`);
+  }
+
+  async getSpendingByCategory(
+    userId: number,
+    params?: {
+      startDate?: string;
+      endDate?: string;
+      currency?: string;
+    }
+  ) {
+    const queryParams = new URLSearchParams({ user_id: userId.toString() });
+    if (params?.startDate) queryParams.append('start_date', params.startDate);
+    if (params?.endDate) queryParams.append('end_date', params.endDate);
+    if (params?.currency) queryParams.append('currency', params.currency);
+
+    return this.request(`/analytics/spending-by-category?${queryParams.toString()}`);
+  }
+
+  async getMonthlySpending(
+    userId: number,
+    params?: {
+      months?: number;
+      currency?: string;
+    }
+  ) {
+    const queryParams = new URLSearchParams({ user_id: userId.toString() });
+    if (params?.months) queryParams.append('months', params.months.toString());
+    if (params?.currency) queryParams.append('currency', params.currency);
+
+    return this.request(`/analytics/monthly-spending?${queryParams.toString()}`);
+  }
+
+  async getInsights(
+    userId: number,
+    params?: {
+      startDate?: string;
+      endDate?: string;
+    }
+  ) {
+    const queryParams = new URLSearchParams({ user_id: userId.toString() });
+    if (params?.startDate) queryParams.append('start_date', params.startDate);
+    if (params?.endDate) queryParams.append('end_date', params.endDate);
+
+    return this.request(`/analytics/insights?${queryParams.toString()}`);
   }
 
   // User profile
-  async getProfile() {
-    return this.request('/profile');
+  async getProfile(userId: number) {
+    return this.request(`/users/${userId}`);
   }
 
-  async updateProfile(data: any) {
-    return this.request('/profile', {
+  async updateProfile(userId: number, data: any) {
+    return this.request(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });

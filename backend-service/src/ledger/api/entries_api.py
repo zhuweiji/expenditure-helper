@@ -7,35 +7,9 @@ from sqlalchemy.orm import Session
 from src.database import get_db_session
 
 from ..models import Entry as EntryModel
+from .entries_schemas import Entry, EntryCreate, EntryUpdate
 
 router = APIRouter()
-
-
-class EntryBase(BaseModel):
-    account_id: int
-    amount: float
-    entry_type: str
-    description: Optional[str] = None
-
-
-class EntryCreate(EntryBase):
-    pass
-
-
-class EntryUpdate(EntryBase):
-    pass
-
-
-class Entry(BaseModel):
-    id: int
-    account_id: int
-    amount: float
-    entry_type: str
-    description: Optional[str] = None
-    timestamp: datetime
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/", response_model=Entry, status_code=201)
@@ -106,4 +80,5 @@ async def delete_entry(entry_id: int, db: Session = Depends(get_db_session)):
 
     db.delete(db_entry)
     db.commit()
+    return None
     return None

@@ -1,23 +1,42 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
+import { apiClient, type ApiError } from '../lib/api';
 
 export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
-    // Mock login - in production, call apiClient.login(email, password)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Since passwords are not implemented, we use email as username
+      // and try to find the user by username
+      const user = await apiClient.getUserByUsername(email);
+
+      // Store user info in localStorage
       localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userId', user.id.toString());
+      localStorage.setItem('username', user.username);
+      localStorage.setItem('userEmail', user.email);
+
       navigate('/');
-    }, 1000);
+    } catch (err) {
+      const apiError = err as ApiError;
+      if (apiError.status === 404) {
+        setError('User not found. Please sign up first.');
+      } else {
+        setError('Failed to login. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -32,22 +51,26 @@ export function Login() {
 
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
+
             <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-primary mb-2"
-              >
-                Email
-              </label>
+                Username
               <input
                 id="email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input w-full"
-                placeholder="you@example.com"
+                placeholder="your-username"
                 required
               />
+              <p className="text-xs text-secondary mt-1">
+                Note: Passwords are not implemented yet. Please your username.
+              </p>
             </div>
 
             <div>
@@ -64,8 +87,11 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="input w-full"
                 placeholder="••••••••"
-                required
+                disabled
               />
+              <p className="text-xs text-secondary mt-1">
+                Password functionality coming soon.
+              </p>
             </div>
 
             <button

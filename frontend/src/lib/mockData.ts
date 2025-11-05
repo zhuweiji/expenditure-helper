@@ -1,13 +1,22 @@
 // Mock data for demonstration purposes
 
-export interface Transaction {
-  id: string;
-  date: string;
-  description: string;
+export interface TransactionEntry {
+  account_name: string;
+  account_type: string;
   amount: number;
-  category: string;
-  type: 'credit' | 'debit';
-  merchant?: string;
+  entry_type: 'debit' | 'credit';
+  description?: string;
+}
+
+export interface Transaction {
+  id: number;
+  user_id: number;
+  description: string;
+  transaction_date: string;
+  reference?: string;
+  amount: number;
+  entries: TransactionEntry[];
+  detailed_entries: TransactionEntry[];
 }
 
 export interface CategorySpending {
@@ -24,76 +33,212 @@ export interface MonthlySpending {
 
 export const mockTransactions: Transaction[] = [
   {
-    id: '1',
-    date: '2025-11-03',
+    id: 1,
+    user_id: 1,
     description: 'Grocery Store',
+    transaction_date: '2025-11-03',
+    reference: 'WF-001',
     amount: -85.50,
-    category: 'Groceries',
-    type: 'debit',
-    merchant: 'Whole Foods',
+    entries: [
+      {
+        account_name: 'Groceries',
+        account_type: 'user',
+        amount: -85.50,
+        entry_type: 'debit',
+        description: 'Whole Foods purchase',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Groceries',
+        account_type: 'user',
+        amount: -85.50,
+        entry_type: 'debit',
+        description: 'Whole Foods purchase',
+      },
+    ],
   },
   {
-    id: '2',
-    date: '2025-11-02',
+    id: 2,
+    user_id: 1,
     description: 'Salary Deposit',
+    transaction_date: '2025-11-02',
+    reference: 'DEPOSIT-001',
     amount: 3500.00,
-    category: 'Income',
-    type: 'credit',
-    merchant: 'Employer Inc',
+    entries: [
+      {
+        account_name: 'Checking Account',
+        account_type: 'user',
+        amount: 3500.00,
+        entry_type: 'credit',
+        description: 'Monthly salary',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Checking Account',
+        account_type: 'user',
+        amount: 3500.00,
+        entry_type: 'credit',
+        description: 'Monthly salary',
+      },
+    ],
   },
   {
-    id: '3',
-    date: '2025-11-02',
+    id: 3,
+    user_id: 1,
     description: 'Coffee Shop',
+    transaction_date: '2025-11-02',
+    reference: 'SB-001',
     amount: -4.75,
-    category: 'Dining',
-    type: 'debit',
-    merchant: 'Starbucks',
+    entries: [
+      {
+        account_name: 'Dining',
+        account_type: 'user',
+        amount: -4.75,
+        entry_type: 'debit',
+        description: 'Coffee purchase',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Dining',
+        account_type: 'user',
+        amount: -4.75,
+        entry_type: 'debit',
+        description: 'Coffee purchase',
+      },
+    ],
   },
   {
-    id: '4',
-    date: '2025-11-01',
+    id: 4,
+    user_id: 1,
     description: 'Gas Station',
+    transaction_date: '2025-11-01',
+    reference: 'SHELL-001',
     amount: -65.00,
-    category: 'Transportation',
-    type: 'debit',
-    merchant: 'Shell',
+    entries: [
+      {
+        account_name: 'Transportation',
+        account_type: 'user',
+        amount: -65.00,
+        entry_type: 'debit',
+        description: 'Fuel',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Transportation',
+        account_type: 'user',
+        amount: -65.00,
+        entry_type: 'debit',
+        description: 'Fuel',
+      },
+    ],
   },
   {
-    id: '5',
-    date: '2025-10-31',
+    id: 5,
+    user_id: 1,
     description: 'Online Shopping',
+    transaction_date: '2025-10-31',
+    reference: 'AMAZON-001',
     amount: -129.99,
-    category: 'Shopping',
-    type: 'debit',
-    merchant: 'Amazon',
+    entries: [
+      {
+        account_name: 'Shopping',
+        account_type: 'user',
+        amount: -129.99,
+        entry_type: 'debit',
+        description: 'Amazon purchase',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Shopping',
+        account_type: 'user',
+        amount: -129.99,
+        entry_type: 'debit',
+        description: 'Amazon purchase',
+      },
+    ],
   },
   {
-    id: '6',
-    date: '2025-10-30',
+    id: 6,
+    user_id: 1,
     description: 'Restaurant',
+    transaction_date: '2025-10-30',
+    reference: 'REST-001',
     amount: -67.80,
-    category: 'Dining',
-    type: 'debit',
-    merchant: 'The Bistro',
+    entries: [
+      {
+        account_name: 'Dining',
+        account_type: 'user',
+        amount: -67.80,
+        entry_type: 'debit',
+        description: 'Dinner',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Dining',
+        account_type: 'user',
+        amount: -67.80,
+        entry_type: 'debit',
+        description: 'Dinner',
+      },
+    ],
   },
   {
-    id: '7',
-    date: '2025-10-29',
+    id: 7,
+    user_id: 1,
     description: 'Gym Membership',
+    transaction_date: '2025-10-29',
+    reference: 'GYM-001',
     amount: -49.99,
-    category: 'Health',
-    type: 'debit',
-    merchant: 'FitLife Gym',
+    entries: [
+      {
+        account_name: 'Health',
+        account_type: 'user',
+        amount: -49.99,
+        entry_type: 'debit',
+        description: 'Monthly subscription',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Health',
+        account_type: 'user',
+        amount: -49.99,
+        entry_type: 'debit',
+        description: 'Monthly subscription',
+      },
+    ],
   },
   {
-    id: '8',
-    date: '2025-10-28',
+    id: 8,
+    user_id: 1,
     description: 'Electric Bill',
+    transaction_date: '2025-10-28',
+    reference: 'ELEC-001',
     amount: -95.30,
-    category: 'Utilities',
-    type: 'debit',
-    merchant: 'Electric Co',
+    entries: [
+      {
+        account_name: 'Utilities',
+        account_type: 'user',
+        amount: -95.30,
+        entry_type: 'debit',
+        description: 'Monthly bill',
+      },
+    ],
+    detailed_entries: [
+      {
+        account_name: 'Utilities',
+        account_type: 'user',
+        amount: -95.30,
+        entry_type: 'debit',
+        description: 'Monthly bill',
+      },
+    ],
   },
 ];
 
