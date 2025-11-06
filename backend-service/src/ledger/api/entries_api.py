@@ -12,7 +12,7 @@ from .entries_schemas import Entry, EntryCreate, EntryUpdate
 router = APIRouter()
 
 
-@router.post("/", response_model=Entry, status_code=201)
+@router.post("", response_model=Entry, status_code=201)
 async def create_entry(entry: EntryCreate, db: Session = Depends(get_db_session)):
     """Create a new entry"""
     db_entry = EntryModel(
@@ -37,7 +37,7 @@ async def read_entry(entry_id: int, db: Session = Depends(get_db_session)):
     return db_entry
 
 
-@router.get("/", response_model=List[Entry])
+@router.get("", response_model=List[Entry])
 async def list_entries(
     skip: int = 0,
     limit: int = 100,

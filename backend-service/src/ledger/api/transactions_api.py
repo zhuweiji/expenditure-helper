@@ -18,10 +18,19 @@ from .transactions_schemas import (
 router = APIRouter()
 
 
-@router.post("/")
-def create_transaction(
-    transaction: TransactionCreate, db: Session = Depends(get_db_session)
-):
+def _create_transaction_with_entries(
+    transaction: TransactionCreate, db: Session
+) -> TransactionModel:
+    """
+    Internal method to create a transaction with its associated entries.
+
+    Args:
+        transaction: TransactionCreate schema with user_id, description, date, reference, and entries
+        db: Database session
+
+    Returns:
+        The created TransactionModel instance
+    """
     db_transaction = TransactionModel(
         user_id=transaction.user_id,
         description=transaction.description,
@@ -31,6 +40,7 @@ def create_transaction(
     db.add(db_transaction)
     db.commit()
     db.refresh(db_transaction)
+
     # Add entries if provided
     for entry in transaction.entries:
         db_entry = EntryModel(
@@ -39,6 +49,7 @@ def create_transaction(
             amount=entry.amount,
             entry_type=entry.entry_type,
             description=entry.description,
+            timestamp=entry.timestamp if entry.timestamp else datetime.utcnow(),
         )
         db.add(db_entry)
     db.commit()
@@ -46,7 +57,36 @@ def create_transaction(
     return db_transaction
 
 
-@router.get("/")
+@router.post("")
+def create_transaction(
+    transaction: TransactionCreate, db: Session = Depends(get_db_session)
+):
+    """Create a single transaction with its entries."""
+    return _create_transaction_with_entries(transaction, db)
+
+
+@router.post("/batch")
+def batch_create_transactions(
+    transactions: List[TransactionCreate], db: Session = Depends(get_db_session)
+):
+    """
+    Create multiple transactions in batch.
+
+    Args:
+        transactions: List of TransactionCreate schemas
+        db: Database session
+
+    Returns:
+        List of created transactions
+    """
+    created_transactions = []
+    for transaction in transactions:
+        db_transaction = _create_transaction_with_entries(transaction, db)
+        created_transactions.append(db_transaction)
+    return created_transactions
+
+
+@router.get("")
 def list_transactions(
     user_id: int,
     startDate: Optional[str] = None,
@@ -196,11 +236,6 @@ def delete_transaction(
         )
         .first()
     )
-    if db_tx is None:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    db.delete(db_tx)
-    db.commit()
-    return {"detail": "Transaction deleted"}
     if db_tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(db_tx)

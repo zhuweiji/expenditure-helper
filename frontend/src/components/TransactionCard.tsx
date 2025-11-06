@@ -39,11 +39,11 @@ export function TransactionCard({ transaction, onClick }: TransactionCardProps) 
           onClick?.();
           setIsExpanded(!isExpanded);
         }}
-        className="cursor-pointer flex items-center justify-between"
+        className="cursor-pointer flex items-center justify-between gap-4"
       >
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-1 md:gap-4 min-w-0">
           <div
-            className={`p-3 rounded-full ${
+            className={`p-1 md:p-3 rounded-full flex-shrink-0 ${
               transaction.detailed_entries?.some(e => e.entry_type === 'credit') ? 'bg-success/10' : 'bg-error/10'
             }`}
           >
@@ -54,10 +54,10 @@ export function TransactionCard({ transaction, onClick }: TransactionCardProps) 
             )}
           </div>
           
-          <div>
-            <p className="font-medium text-primary">{transaction.description}</p>
+          <div className="min-w-0">
+            <p className="font-medium text-primary truncate">{transaction.description}</p>
             <div className="flex items-center space-x-2 mt-1">
-              <span className="text-sm text-secondary">
+              <span className="text-sm text-secondary truncate">
                 {transaction.reference || 'Uncategorised'}
               </span>
             </div>
@@ -91,7 +91,8 @@ export function TransactionCard({ transaction, onClick }: TransactionCardProps) 
 
       {isExpanded && (
         <div className="mt-4 border-t pt-4">
-          <p className="font-medium text-sm text-secondary mb-2">Journal Entries</p>
+          <p className="font-medium text-sm text-secondary mb-2">{transaction.description}</p>
+          <p className="font-medium text-sm text-secondary mb-2 pt-1">Entries</p>
           <div className="space-y-2">
             {transaction.detailed_entries.map((entry, index) => (
               <div key={index} className="flex justify-between text-sm">

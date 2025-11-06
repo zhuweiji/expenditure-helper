@@ -7,6 +7,27 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, RootModel
 
 
+class AccountBaseRequest(BaseModel):
+    name: str
+    balance: int
+
+
+class AccountCreateRequest(AccountBaseRequest):
+    user_id: int
+
+
+class AccountUpdateRequest(AccountBaseRequest):
+    pass
+
+
+class AccountRequest(AccountBaseRequest):
+    id: int
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+
 class AppBaseModel(BaseModel):
     class Config:
         from_attributes = True

@@ -16,6 +16,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    timezone: Mapped[str] = mapped_column(String, default="UTC")
+    currency: Mapped[str] = mapped_column(String, default="USD")
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     # Relationships

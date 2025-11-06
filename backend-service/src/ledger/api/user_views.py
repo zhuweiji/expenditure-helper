@@ -36,10 +36,6 @@ def get_user_accounts(user_id: int, db: Session = Depends(get_db_session)):
             entry.amount for entry in account.entries if entry.entry_type == "debit"
         )
 
-        log.info(
-            entry.amount for entry in account.entries if entry.entry_type == "debit"
-        )
-
         accounts_by_type[account_type].append(
             {
                 "account_id": account.id,

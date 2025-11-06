@@ -23,6 +23,8 @@ class UserUpdateRequest(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
+    timezone: Optional[str] = None
+    currency: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -31,13 +33,15 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str]
     is_active: bool
+    timezone: str
+    currency: str
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-@router.get("/", response_model=list[UserResponse])
+@router.get("", response_model=list[UserResponse])
 def list_users(
     skip: int = 0,
     limit: int = 100,
@@ -56,7 +60,7 @@ def list_users(
     return users
 
 
-@router.post("/", response_model=UserResponse, status_code=201)
+@router.post("", response_model=UserResponse, status_code=201)
 def create_user(user: UserCreateRequest, db: Session = Depends(get_db_session)):
     """
     Create a new user and automatically set up default accounts for double-entry bookkeeping.
@@ -150,6 +154,10 @@ def update_user(
         db_user.full_name = user_update.full_name
     if user_update.is_active is not None:
         db_user.is_active = user_update.is_active
+    if user_update.timezone is not None:
+        db_user.timezone = user_update.timezone
+    if user_update.currency is not None:
+        db_user.currency = user_update.currency
 
     try:
         db.commit()

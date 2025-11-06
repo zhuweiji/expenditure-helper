@@ -1,37 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from src.common.logger import get_logger
 from src.database import get_db_session
 
 from ..models.account import Account
-from ..models.entry import Entry
+from ..models.transaction import Transaction
+from .account_schemas import AccountCreateRequest, AccountUpdateRequest
+
+log = get_logger(__name__)
 
 router = APIRouter()
 
 
-class AccountBaseRequest(BaseModel):
-    name: str
-    balance: int
-
-
-class AccountCreateRequest(AccountBaseRequest):
-    user_id: int
-
-
-class AccountUpdateRequest(AccountBaseRequest):
-    pass
-
-
-class AccountRequest(AccountBaseRequest):
-    id: int
-    user_id: int
-
-    class Config:
-        from_attributes = True
-
-
-@router.post("/")
+@router.post("")
 def create_account(
     account: AccountCreateRequest, db: Session = Depends(get_db_session)
 ):
@@ -104,25 +86,20 @@ def delete_account(
 
 @router.delete("/user/{user_id}/clear")
 def clear_all_accounts(user_id: int, db: Session = Depends(get_db_session)):
-    """Clear all entries from all accounts for a specific user"""
-    # Get all account IDs for the user
-    account_ids = db.query(Account.id).filter(Account.user_id == user_id).all()
-    account_ids_list = [aid[0] for aid in account_ids]
-
-    if not account_ids_list:
-        return {
-            "deleted_count": 0,
-            "message": f"No accounts found for user {user_id}",
-        }
-
-    # Delete all entries associated with those accounts
+    """Clear all transactions from all accounts for a specific user"""
+    # Delete all transactions owned by the user
+    # This will cascade-delete all associated entries through the relationship
     deleted_count = (
-        db.query(Entry)
-        .filter(Entry.account_id.in_(account_ids_list))
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id)
         .delete(synchronize_session=False)
     )
     db.commit()
+
+    log.info(
+        f"Cleared {deleted_count} transaction(s) (and associated entries) for user {user_id}"
+    )
     return {
         "deleted_count": deleted_count,
-        "message": f"Cleared {deleted_count} entry(entries) from accounts for user {user_id}",
+        "message": f"Cleared {deleted_count} transaction(s) and all associated entries for user {user_id}",
     }

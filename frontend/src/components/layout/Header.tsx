@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export function Header({ title, onMenuClick }: HeaderProps) {
   return (
-    <header className="bg-card border-b border-secondary/10 sticky top-0 z-40">
+    <header className="bg-card/80 backdrop-blur-md border-b border-secondary/10 sticky top-0 z-40">
       <div className="flex items-center justify-between h-16 px-4 md:px-6">
         <div className="flex items-center">
           {onMenuClick && (

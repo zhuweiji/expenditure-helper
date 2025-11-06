@@ -3,6 +3,8 @@ import { ENABLE_MOCK_DATA, TEST_USER_ID } from './config';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9110';
 
+console.log(API_BASE_URL)
+
 export interface ApiError {
   message: string;
   status: number;
@@ -55,6 +57,7 @@ class ApiClient {
     options?: RequestInit
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log(url)
     
     try {
       const response = await fetch(url, {
@@ -135,6 +138,14 @@ class ApiClient {
     });
   }
 
+  async batchCreateTransactions(userId: number, transactions: any[]) {
+    const transactionsWithUserId = transactions.map(t => ({ ...t, user_id: userId }));
+    return this.request('/transactions/batch', {
+      method: 'POST',
+      body: JSON.stringify(transactionsWithUserId),
+    });
+  }
+
   // Statement upload
   async uploadStatement(file: File, userId: number) {
     const formData = new FormData();
@@ -153,6 +164,25 @@ class ApiClient {
     }
 
     return await response.json();
+  }
+
+  async getProcessingStatus(processingId: number, userId: number) {
+    return this.request(`/statements/processing/${processingId}?user_id=${userId}`);
+  }
+
+  async getStatementDetail(statementId: number, userId: number) {
+    return this.request(`/statements/${statementId}?user_id=${userId}`);
+  }
+
+  async prepareEntries(request: any) {
+    return this.request('/statements/create-entries', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getAccountsByUser(userId: number) {
+    return this.request(`/users/${userId}/accounts`);
   }
 
   // Analytics endpoints
@@ -217,6 +247,13 @@ class ApiClient {
     return this.request(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Clear all transactions/entries for a user
+  async clearAllTransactions(userId: number) {
+    return this.request(`/accounts/user/${userId}/clear`, {
+      method: 'DELETE',
     });
   }
 }

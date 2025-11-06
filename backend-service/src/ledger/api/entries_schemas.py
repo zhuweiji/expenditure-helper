@@ -12,7 +12,7 @@ class EntryBase(BaseModel):
 
 
 class EntryCreate(EntryBase):
-    pass
+    timestamp: Optional[datetime] = None
 
 
 class EntryUpdate(EntryBase):

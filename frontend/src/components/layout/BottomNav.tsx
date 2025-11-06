@@ -10,7 +10,7 @@ const navigation = [
 
 export function BottomNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card border-t border-secondary/10 z-50">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-card/80 backdrop-blur-md border-t border-secondary/10 z-50">
       <div className="flex justify-around items-center h-16">
         {navigation.map((item) => (
           <NavLink

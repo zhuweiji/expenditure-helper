@@ -1,4 +1,5 @@
 import os
+from sys import prefix
 
 import uvicorn
 from dotenv import load_dotenv
@@ -19,7 +20,9 @@ from src.ledger.api import (
 load_dotenv()
 
 log = get_logger(__name__)
-app = FastAPI()
+app = FastAPI(
+    redirect_slashes=False, docs_url="/api/docs", openapi_url="/api/openapi.json"
+)
 
 # Get CORS origins from environment variable, fallback to localhost if not set
 # CORS_ORIGINS should be a comma-separated list of origins
@@ -42,20 +45,31 @@ app.add_middleware(
 )
 
 
-app.include_router(user_management.router, prefix="/users", tags=["users"])
-app.include_router(user_views.router, prefix="/users", tags=["users"])
+# @app.middleware("http")
+# async def add_csp_header(request, call_next):
+#     response = await call_next(request)
+#     response.headers["Content-Security-Policy"] = (
+#         "upgrade-insecure-requests; block-all-mixed-content"
+#     )
+#     return response
 
-app.include_router(account_management.router, prefix="/accounts", tags=["accounts"])
-app.include_router(account_views.router, prefix="/accounts", tags=["accounts"])
 
-app.include_router(entries_api.router, prefix="/entries", tags=["entries"])
+app.include_router(user_management.router, prefix="/api/users", tags=["users"])
+app.include_router(user_views.router, prefix="/api/users", tags=["users"])
+
+app.include_router(account_management.router, prefix="/api/accounts", tags=["accounts"])
+app.include_router(account_views.router, prefix="/api/accounts", tags=["accounts"])
+
+app.include_router(entries_api.router, prefix="/api/entries", tags=["entries"])
 app.include_router(
-    transactions_api.router, prefix="/transactions", tags=["transactions"]
+    transactions_api.router, prefix="/api/transactions", tags=["transactions"]
 )
-app.include_router(statement_apis.router, prefix="/statements", tags=["statements"])
-app.include_router(create_entries_api.router, prefix="/statements", tags=["statements"])
+app.include_router(statement_apis.router, prefix="/api/statements", tags=["statements"])
+app.include_router(
+    create_entries_api.router, prefix="/api/statements", tags=["statements"]
+)
 
-app.include_router(analytics_api.router, prefix="/analytics", tags=["analytics"])
+app.include_router(analytics_api.router, prefix="/api/analytics", tags=["analytics"])
 
 
 @app.get("/")

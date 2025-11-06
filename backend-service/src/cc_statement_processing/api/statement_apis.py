@@ -135,7 +135,7 @@ async def upload_and_process_statement(
         )
 
 
-@router.get("/", response_model=list[StatementListResponse])
+@router.get("", response_model=list[StatementListResponse])
 async def list_statements(
     user_id: int,
     skip: int = 0,
