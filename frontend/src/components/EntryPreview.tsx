@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react';
-import { AlertCircle, ChevronDown, ChevronUp, ArrowUpDown } from 'lucide-react';
+import { AlertCircle, ArrowUpDown } from 'lucide-react';
 import type {
   PrepareEntriesResponse,
   AccountsByType,
+  Transaction,
+  TransactionEntry,
 } from '../lib/types';
+import { TransactionCard } from './TransactionCard';
 
 interface EntryPreviewProps {
   preview: PrepareEntriesResponse;
@@ -30,9 +33,6 @@ export function EntryPreview({
   defaultExpenseAccountId: defaultExpenseAccountIdProp = null,
   defaultBankAccountId = null,
 }: EntryPreviewProps) {
-  const [expandedTransactions, setExpandedTransactions] = useState<Set<number>>(
-    new Set([0])
-  ); // Expand first transaction by default
   const [creditCardAccountId, setCreditCardAccountId] = useState<number | null>(
     defaultCreditCardAccountId
   );
@@ -43,16 +43,6 @@ export function EntryPreview({
   );
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  const toggleTransaction = (index: number) => {
-    const newExpanded = new Set(expandedTransactions);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
-    } else {
-      newExpanded.add(index);
-    }
-    setExpandedTransactions(newExpanded);
-  };
 
   const handleSelectAccountsAndGeneratePreview = () => {
     if (!creditCardAccountId || !defaultExpenseAccountId) {
@@ -78,6 +68,16 @@ export function EntryPreview({
       currency: 'USD',
     }).format(amount);
   };
+
+  // Adapter function to convert TransactionPreview to Transaction format
+  const adaptTransaction = (transactionPreview: typeof preview.transactions[0], index: number): Transaction => ({
+    id: index,
+    description: transactionPreview.description,
+    transaction_date: transactionPreview.transaction_date,
+    reference: undefined,
+    entries: transactionPreview.entries as unknown as TransactionEntry[],
+    detailed_entries: transactionPreview.entries as unknown as TransactionEntry[],
+  });
 
   const sortedTransactions = useMemo(() => {
     const sorted = [...preview.transactions];
@@ -261,74 +261,11 @@ export function EntryPreview({
         <div className="max-h-96 md:max-h-[600px] overflow-y-auto border border-secondary/20 rounded-lg">
           <div className="space-y-3 p-3">
             {sortedTransactions.map((transaction, index) => (
-          <div key={index} className="border border-secondary/20 rounded-lg overflow-hidden">
-            {/* Transaction Header */}
-            <button
-              onClick={() => toggleTransaction(index)}
-              className="w-full px-4 py-3 bg-secondary/5 hover:bg-secondary/10 transition-colors flex items-center justify-between text-left"
-            >
-              <div className="flex-1">
-                <p className="font-medium text-primary">
-                  {transaction.description}
-                </p>
-                <p className="text-sm text-secondary">
-                  {new Date(transaction.transaction_date).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="text-right mr-3">
-                <p className="font-semibold text-primary">
-                  {formatCurrency(
-                    transaction.entries
-                      .filter((entry) => entry.entry_type === 'debit')
-                      .reduce((sum, entry) => sum + entry.amount, 0)
-                  )}
-                </p>
-                <p className='text-sm text-secondary'>{transaction.entries.length} entries</p>
-
-              </div>
-              <div className="flex-shrink-0">
-                {expandedTransactions.has(index) ? (
-                  <ChevronUp className="w-5 h-5 text-secondary" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-secondary" />
-                )}
-              </div>
-            </button>
-
-            {/* Transaction Details */}
-            {expandedTransactions.has(index) && (
-              <div className="bg-background px-4 py-4 space-y-3 border-t border-secondary/20">
-                {transaction.entries.map((entry, entryIndex) => (
-                  <div key={entryIndex} className="flex items-center justify-between text-sm">
-                    <div>
-                      <p className="text-primary">
-                        {entry.account_name}
-                        <span className="text-secondary ml-2">
-                          ({entry.entry_type})
-                        </span>
-                      </p>
-                      {entry.description && (
-                        <p className="text-xs text-secondary mt-1">
-                          {entry.description}
-                        </p>
-                      )}
-                    </div>
-                    <p
-                      className={`font-semibold ${
-                        entry.entry_type === 'debit'
-                          ? 'text-error'
-                          : 'text-success'
-                      }`}
-                    >
-                      {entry.entry_type === 'debit' ? '-' : '+'}
-                      {formatCurrency(entry.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+              <TransactionCard
+                key={index}
+                transaction={adaptTransaction(transaction, index)}
+              />
+            ))}
           </div>
         </div>
       </div>

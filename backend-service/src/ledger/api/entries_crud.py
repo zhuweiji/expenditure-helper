@@ -1,8 +1,11 @@
+"""
+CRUD endpoints for Entry operations.
+"""
+
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from src.database import get_db_session
 
@@ -14,7 +17,7 @@ router = APIRouter()
 
 @router.post("", response_model=Entry, status_code=201)
 async def create_entry(entry: EntryCreate, db: Session = Depends(get_db_session)):
-    """Create a new entry"""
+    """Create a new entry."""
     db_entry = EntryModel(
         account_id=entry.account_id,
         amount=entry.amount,
@@ -30,7 +33,7 @@ async def create_entry(entry: EntryCreate, db: Session = Depends(get_db_session)
 
 @router.get("/{entry_id}", response_model=Entry)
 async def read_entry(entry_id: int, db: Session = Depends(get_db_session)):
-    """Retrieve an entry by ID"""
+    """Retrieve an entry by ID."""
     db_entry = db.query(EntryModel).filter(EntryModel.id == entry_id).first()
     if db_entry is None:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -44,7 +47,7 @@ async def list_entries(
     account_id: Optional[int] = None,
     db: Session = Depends(get_db_session),
 ):
-    """List all entries with optional filtering by account_id"""
+    """List all entries with optional filtering by account_id."""
     query = db.query(EntryModel)
     if account_id is not None:
         query = query.filter(EntryModel.account_id == account_id)
@@ -56,7 +59,7 @@ async def list_entries(
 async def update_entry(
     entry_id: int, entry: EntryUpdate, db: Session = Depends(get_db_session)
 ):
-    """Update an entry by ID"""
+    """Update an entry."""
     db_entry = db.query(EntryModel).filter(EntryModel.id == entry_id).first()
     if db_entry is None:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -73,12 +76,11 @@ async def update_entry(
 
 @router.delete("/{entry_id}", status_code=204)
 async def delete_entry(entry_id: int, db: Session = Depends(get_db_session)):
-    """Delete an entry by ID"""
+    """Delete an entry."""
     db_entry = db.query(EntryModel).filter(EntryModel.id == entry_id).first()
     if db_entry is None:
         raise HTTPException(status_code=404, detail="Entry not found")
 
     db.delete(db_entry)
     db.commit()
-    return None
     return None

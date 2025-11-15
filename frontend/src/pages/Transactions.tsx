@@ -2,7 +2,9 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { Header } from '../components/layout/Header';
 import { TransactionCard } from '../components/TransactionCard';
 import { FloatingActionButton } from '../components/FloatingActionButton';
+import { TransactionEditModal } from '../components/TransactionEditModal';
 import { Filter, Search, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Transaction } from '../lib/types';
 import { mockTransactions } from '../lib/mockData';
 import { apiClient, getCurrentUserId, shouldUseMockData } from '../lib/api';
 
@@ -20,6 +22,9 @@ export function Transactions() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{ account_id: number; account_name: string }>>([]);
   const pageSize = 1000;
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -160,6 +165,101 @@ export function Transactions() {
     };
   }, [currentPage, startDate, endDate]);
 
+  // Fetch available accounts
+  useEffect(() => {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const useMockData = shouldUseMockData(userId);
+    if (useMockData) {
+      // Set mock accounts
+      setAvailableAccounts([
+        { account_id: 1, account_name: 'Checking' },
+        { account_id: 2, account_name: 'Savings' },
+        { account_id: 3, account_name: 'Groceries' },
+        { account_id: 4, account_name: 'Utilities' },
+      ]);
+      return;
+    }
+
+    let mounted = true;
+
+    async function fetchAccounts() {
+      try {
+        const response: any = await apiClient.getAccountsByUser(userId as number);
+        if (mounted) {
+          // Map the response to the expected format
+          const accounts = (response.accounts || response || []).map((acc: any) => ({
+            account_id: acc.account_id,
+            account_name: acc.account_name,
+          }));
+          setAvailableAccounts(accounts);
+        }
+      } catch (err) {
+        console.error('Failed to fetch accounts', err);
+      }
+    }
+
+    fetchAccounts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleEditTransaction = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTransaction = async (updatedTransaction: Transaction) => {
+    const userId = getCurrentUserId();
+    if (!userId || !selectedTransaction) return;
+
+    const useMockData = shouldUseMockData(userId);
+    if (useMockData) {
+      // Update mock data
+      setTransactions(prev =>
+        prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t)
+      );
+      return;
+    }
+
+    try {
+      await apiClient.updateTransaction(updatedTransaction.id, userId, {
+        description: updatedTransaction.description,
+        transaction_date: updatedTransaction.transaction_date,
+        detailed_entries: updatedTransaction.detailed_entries,
+      });
+
+      setTransactions(prev =>
+        prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t)
+      );
+    } catch (err) {
+      console.error('Failed to update transaction', err);
+      throw err;
+    }
+  };
+
+  const handleDeleteTransaction = async (transactionId: number) => {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const useMockData = shouldUseMockData(userId);
+    if (useMockData) {
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      return;
+    }
+
+    try {
+      await apiClient.deleteTransaction(transactionId, userId);
+      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+    } catch (err) {
+      console.error('Failed to delete transaction', err);
+      throw err;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Header title="Transactions" />
@@ -298,7 +398,12 @@ export function Transactions() {
             </div>
           ) : filteredTransactions.length > 0 ? (
             filteredTransactions.map((transaction) => (
-              <TransactionCard key={transaction.id} transaction={transaction} />
+              <TransactionCard
+                key={transaction.id}
+                transaction={transaction}
+                onEdit={handleEditTransaction}
+                onDelete={handleDeleteTransaction}
+              />
             ))
           ) : (
             <div className="card text-center py-12">
@@ -306,6 +411,20 @@ export function Transactions() {
             </div>
           )}
         </div>
+
+        {selectedTransaction && (
+          <TransactionEditModal
+            transaction={selectedTransaction}
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedTransaction(null);
+            }}
+            onSave={handleSaveTransaction}
+            onDelete={handleDeleteTransaction}
+            availableAccounts={availableAccounts}
+          />
+        )}
 
         {/* Pagination Controls */}
         {totalPages > 1 && (

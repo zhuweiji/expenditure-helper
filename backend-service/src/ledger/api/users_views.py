@@ -1,3 +1,7 @@
+"""
+Extended view endpoints for User analytics and reporting.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from src.common.logger import get_logger

@@ -1,44 +1,19 @@
-from datetime import datetime
+"""
+CRUD endpoints for User operations.
+"""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from src.database import get_db_session
 
 from ..models.user import User
 from ..services.user_account_service import create_default_accounts_for_user
+from .user_schemas import UserCreateRequest, UserResponse, UserUpdateRequest
 
 router = APIRouter()
-
-
-class UserCreateRequest(BaseModel):
-    username: str
-    email: EmailStr
-    full_name: Optional[str] = None
-
-
-class UserUpdateRequest(BaseModel):
-    email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
-    is_active: Optional[bool] = None
-    timezone: Optional[str] = None
-    currency: Optional[str] = None
-
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    email: str
-    full_name: Optional[str]
-    is_active: bool
-    timezone: str
-    currency: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 @router.get("", response_model=list[UserResponse])
@@ -126,7 +101,7 @@ def get_user_by_email_address(
     email_address: str, db: Session = Depends(get_db_session)
 ):
     """
-    Get a specific user by username.
+    Get a specific user by email address.
     """
     user = db.query(User).filter(User.email == email_address).first()
     if user is None:

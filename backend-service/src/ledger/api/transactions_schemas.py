@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from ..api.entries_api import Entry, EntryCreate
+from .entries_schemas import Entry, EntryCreate
 
 
 class TransactionBase(BaseModel):

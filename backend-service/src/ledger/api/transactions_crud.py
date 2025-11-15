@@ -1,3 +1,7 @@
+"""
+CRUD endpoints for Transaction operations.
+"""
+
 from datetime import datetime
 from typing import List, Optional
 
@@ -102,6 +106,7 @@ def list_transactions(
     page_size: int = 1000,
     db: Session = Depends(get_db_session),
 ):
+    """List transactions for a user with optional date filtering and pagination."""
     # Build query with filters
     query = db.query(TransactionModel).filter(TransactionModel.user_id == user_id)
 
@@ -181,6 +186,7 @@ def list_transactions(
 def read_transaction(
     transaction_id: int, user_id: int, db: Session = Depends(get_db_session)
 ):
+    """Retrieve a transaction by ID."""
     db_tx = (
         db.query(TransactionModel)
         .filter(
@@ -200,6 +206,7 @@ def update_transaction(
     transaction: TransactionUpdate,
     db: Session = Depends(get_db_session),
 ):
+    """Update a transaction."""
     db_tx = (
         db.query(TransactionModel)
         .filter(
@@ -232,10 +239,11 @@ def update_transaction(
     return db_tx
 
 
-@router.delete("/transactions/{transaction_id}")
+@router.delete("/{transaction_id}")
 def delete_transaction(
     transaction_id: int, user_id: int, db: Session = Depends(get_db_session)
 ):
+    """Delete a transaction."""
     db_tx = (
         db.query(TransactionModel)
         .filter(

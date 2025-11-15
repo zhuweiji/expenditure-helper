@@ -1,3 +1,7 @@
+"""
+CRUD endpoints for Account operations.
+"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,6 +21,7 @@ router = APIRouter()
 def create_account(
     account: AccountCreateRequest, db: Session = Depends(get_db_session)
 ):
+    """Create a new account."""
     db_account = Account(
         name=account.name, balance=account.balance, user_id=account.user_id
     )
@@ -35,6 +40,7 @@ def create_account(
 
 @router.get("/{account_id}")
 def read_account(account_id: int, user_id: int, db: Session = Depends(get_db_session)):
+    """Retrieve an account by ID."""
     account = (
         db.query(Account)
         .filter(Account.id == account_id, Account.user_id == user_id)
@@ -52,6 +58,7 @@ def update_account(
     account: AccountUpdateRequest,
     db: Session = Depends(get_db_session),
 ):
+    """Update an account."""
     db_account = (
         db.query(Account)
         .filter(Account.id == account_id, Account.user_id == user_id)
@@ -72,6 +79,7 @@ def update_account(
 def delete_account(
     account_id: int, user_id: int, db: Session = Depends(get_db_session)
 ):
+    """Delete an account."""
     db_account = (
         db.query(Account)
         .filter(Account.id == account_id, Account.user_id == user_id)
@@ -86,7 +94,7 @@ def delete_account(
 
 @router.delete("/user/{user_id}/clear")
 def clear_all_accounts(user_id: int, db: Session = Depends(get_db_session)):
-    """Clear all transactions from all accounts for a specific user"""
+    """Clear all transactions from all accounts for a specific user."""
     # Get all transactions owned by the user
     transactions = db.query(Transaction).filter(Transaction.user_id == user_id).all()
     deleted_count = len(transactions)

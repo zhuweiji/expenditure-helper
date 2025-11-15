@@ -1,3 +1,7 @@
+"""
+Extended view endpoints for Account analytics and reporting.
+"""
+
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException

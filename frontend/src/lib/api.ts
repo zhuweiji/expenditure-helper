@@ -138,6 +138,19 @@ class ApiClient {
     });
   }
 
+  async updateTransaction(transactionId: number, userId: number, data: any) {
+    return this.request(`/transactions/${transactionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ ...data, user_id: userId }),
+    });
+  }
+
+  async deleteTransaction(transactionId: number, userId: number) {
+    return this.request(`/transactions/${transactionId}?user_id=${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async batchCreateTransactions(userId: number, transactions: any[]) {
     const transactionsWithUserId = transactions.map(t => ({
       user_id: userId,

@@ -1,5 +1,4 @@
 import os
-from sys import prefix
 
 import uvicorn
 from dotenv import load_dotenv
@@ -9,12 +8,13 @@ from src.cc_statement_processing.api import create_entries_api, statement_apis
 from src.common.logger import get_logger
 from src.expenditure_analysis import analytics_api
 from src.ledger.api import (
-    account_management,
-    account_views,
-    entries_api,
-    transactions_api,
-    user_management,
-    user_views,
+    accounts_crud,
+    accounts_views,
+    entries_crud,
+    transactions_crud,
+    transactions_views,
+    users_crud,
+    users_views,
 )
 
 load_dotenv()
@@ -54,15 +54,23 @@ app.add_middleware(
 #     return response
 
 
-app.include_router(user_management.router, prefix="/api/users", tags=["users"])
-app.include_router(user_views.router, prefix="/api/users", tags=["users"])
+app.include_router(users_crud.router, prefix="/api/users", tags=["users"])
+app.include_router(users_views.router, prefix="/api/users", tags=["users-analytics"])
 
-app.include_router(account_management.router, prefix="/api/accounts", tags=["accounts"])
-app.include_router(account_views.router, prefix="/api/accounts", tags=["accounts"])
-
-app.include_router(entries_api.router, prefix="/api/entries", tags=["entries"])
+app.include_router(accounts_crud.router, prefix="/api/accounts", tags=["accounts"])
 app.include_router(
-    transactions_api.router, prefix="/api/transactions", tags=["transactions"]
+    accounts_views.router, prefix="/api/accounts", tags=["accounts-analytics"]
+)
+
+app.include_router(entries_crud.router, prefix="/api/entries", tags=["entries"])
+
+app.include_router(
+    transactions_crud.router, prefix="/api/transactions", tags=["transactions"]
+)
+app.include_router(
+    transactions_views.router,
+    prefix="/api/transactions",
+    tags=["transactions-analytics"],
 )
 app.include_router(statement_apis.router, prefix="/api/statements", tags=["statements"])
 app.include_router(
