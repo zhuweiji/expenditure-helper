@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Header } from '../components/layout/Header';
 import { TransactionCard } from '../components/TransactionCard';
 import { FloatingActionButton } from '../components/FloatingActionButton';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { TrendingDown, DollarSign } from 'lucide-react';
 import { mockTransactions, mockCategorySpending } from '../lib/mockData';
 import { apiClient, getCurrentUserId, shouldUseMockData } from '../lib/api';
 
@@ -37,7 +37,15 @@ export function Home() {
       setLoading(true);
       setError(null);
       try {
+        // Calculate date range for current and last month
+        const today = new Date();
+        const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const startDate = firstDayOfLastMonth.toISOString().split('T')[0];
+        const endDate = today.toISOString().split('T')[0];
+
         const response = (await apiClient.getTransactions(userId as number, {
+          startDate,
+          endDate,
           page: 1,
           pageSize: 20,
         })) as any;
@@ -103,61 +111,51 @@ export function Home() {
     };
   }, []);
 
-  const totalIncome = recentTransactions
-    .filter((t) => t.amount >= 0)
-    .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = Math.abs(
+  const totalSpendingThisMonth = Math.abs(
     recentTransactions
-      .filter((t) => t.amount < 0)
+      .filter((t) => t.amount > 0)
       .reduce((sum, t) => sum + t.amount, 0)
   );
-  const netBalance = totalIncome - totalExpenses;
+
+
+
+  const topTenTransactions = recentTransactions
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+    .slice(0, 10);
+  const sumTopTenTransactions = topTenTransactions
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
   return (
     <div className="min-h-screen bg-background">
       <Header title="Dashboard" />
 
       <div className="max-w-7xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6">
-        {/* Balance Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-secondary mb-1">Total Balance</p>
-                <p className="text-2xl font-bold text-primary">
-                  ${netBalance.toFixed(2)}
-                </p>
-              </div>
-              <div className="p-3 bg-accent/10 rounded-full">
-                <DollarSign className="h-6 w-6 text-accent" />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Income</p>
-                <p className="text-2xl font-bold text-success">
-                  ${totalIncome.toFixed(2)}
-                </p>
-              </div>
-              <div className="p-3 bg-success/10 rounded-full">
-                <TrendingUp className="h-6 w-6 text-success" />
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-secondary mb-1">Expenses</p>
+                <p className="text-sm text-secondary mb-1">Total Spending This Month</p>
                 <p className="text-2xl font-bold text-error">
-                  ${totalExpenses.toFixed(2)}
+                  ${totalSpendingThisMonth.toFixed(2)}
                 </p>
               </div>
               <div className="p-3 bg-error/10 rounded-full">
                 <TrendingDown className="h-6 w-6 text-error" />
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-secondary mb-1">Top 10 Transactions Sum</p>
+                <p className="text-2xl font-bold text-accent">
+                  ${sumTopTenTransactions.toFixed(2)}
+                </p>
+              </div>
+              <div className="p-3 bg-accent/10 rounded-full">
+                <DollarSign className="h-6 w-6 text-accent" />
               </div>
             </div>
           </div>

@@ -50,14 +50,13 @@ export function TransactionCard ({
   const displayAmount = calculateAmount()
 
   return (
-    <div className='card hover:bg-card/80 transition-colors group'>
+    <div className='card hover:bg-card/80 transition-colors group px-2 md:px-5'>
       <div
         onClick={() => {
           onClick?.()
           setIsExpanded(!isExpanded)
         }}
-        className='cursor-pointer flex items-center justify-between gap-4 relative
-'
+        className='cursor-pointer flex items-center justify-between gap-4 relative'
       >
         <div className='flex items-center gap-1 md:gap-4 min-w-0'>
           <div

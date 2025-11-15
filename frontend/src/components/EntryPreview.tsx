@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AlertCircle, ArrowUpDown } from 'lucide-react';
 import type {
   PrepareEntriesResponse,
@@ -43,6 +43,19 @@ export function EntryPreview({
   );
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [hasInitialized, setHasInitialized] = useState(false);
+
+  // Set default accounts on first load
+  useEffect(() => {
+    if (!hasInitialized && accounts.liability?.length && accounts.expense?.length) {
+      const firstLiabilityId = accounts.liability[0].account_id;
+      const firstExpenseId = accounts.expense[0].account_id;
+      
+      setCreditCardAccountId(firstLiabilityId);
+      setDefaultExpenseAccountId(firstExpenseId);
+      setHasInitialized(true);
+    }
+  }, [accounts, hasInitialized]);
 
   const handleSelectAccountsAndGeneratePreview = () => {
     if (!creditCardAccountId || !defaultExpenseAccountId) {
@@ -163,7 +176,8 @@ export function EntryPreview({
             value={creditCardAccountId?.toString() || ''}
             onChange={(e) => setCreditCardAccountId(e.target.value ? Number(e.target.value) : null)}
             disabled={isLoading}
-            className="w-full px-3 py-2 bg-background border border-secondary/30 rounded-lg text-primary focus:outline-none focus:border-accent"
+            className = 'w-full px-3 py-2 border border-secondary/30 rounded-lg text-foreground bg-white dark:bg-neutral-900'
+
           >
             <option value="">Select a liability account...</option>
             {liabilityAccounts.map((account) => (
@@ -185,11 +199,11 @@ export function EntryPreview({
             value={defaultExpenseAccountId?.toString() || ''}
             onChange={(e) => setDefaultExpenseAccountId(e.target.value ? Number(e.target.value) : null)}
             disabled={isLoading}
-            className="w-full px-3 py-2 bg-background border border-secondary/30 rounded-lg text-primary focus:outline-none focus:border-accent"
+            className="w-full px-3 py-2 border border-secondary/30 rounded-lg text-foreground bg-white dark:bg-neutral-900"
           >
-            <option value="">Select an expense account...</option>
+            <option  value="">Select an expense account...</option>
             {expenseAccounts.map((account) => (
-              <option key={account.account_id} value={account.account_id.toString()}>
+              <option  key={account.account_id} value={account.account_id.toString()}>
                 {account.account_name}
               </option>
             ))}

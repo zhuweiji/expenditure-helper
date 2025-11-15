@@ -161,12 +161,13 @@ def list_transactions(
             # Add to detailed entries list
             tx_data["detailed_entries"].append(entry_data)
 
-            # For main view, only show user accounts and use them for total amount
+            # For main view, only show user accounts and use them for total amount - not sure what this means
             if account.account_type == "user":
                 tx_data["entries"].append(entry_data)
-                # For total amount, use the first user account entry
-                if tx_data["amount"] == 0.0:
-                    tx_data["amount"] = float(entry.amount)
+
+            # For total amount, use sum of debit
+            if entry.entry_type == "debit":
+                tx_data["amount"] += float(entry.amount)
 
         result_transactions.append(Transaction(**tx_data))
 

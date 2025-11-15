@@ -266,9 +266,9 @@ export function Transactions() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6">
         {/* Date Range Filter */}
-        <div className="card p-4">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
+        <div className="card p-4 ">
+          <div className="flex flex-row flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-40">
               <label className="text-sm text-secondary mb-2 block">Start Date</label>
               <input
                 type="date"
@@ -280,7 +280,7 @@ export function Transactions() {
                 className="input w-full"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-40">
               <label className="text-sm text-secondary mb-2 block">End Date</label>
               <input
                 type="date"
@@ -298,7 +298,7 @@ export function Transactions() {
                 setEndDate('');
                 setCurrentPage(1);
               }}
-              className="input px-4 py-2 hover:bg-opacity-80 transition-all whitespace-nowrap"
+              className="input px-4 py-2 hover:bg-opacity-80 transition-all"
             >
               Clear Dates
             </button>

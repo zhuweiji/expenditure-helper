@@ -30,8 +30,6 @@ def get_transactions_by_month(
     if result is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Convert plain dicts from the service into Pydantic model instances
-    # so the endpoint returns typed objects instead of raw dicts.
     return [MonthGroup(**m) for m in result]
 
 
@@ -48,5 +46,4 @@ def get_account_transactions(
     if result is None:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    # Wrap the service dict into the response model so we return a typed object.
     return AccountTransactionsResponse(**result)
