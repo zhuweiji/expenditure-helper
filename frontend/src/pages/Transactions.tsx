@@ -1,137 +1,181 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
-import { Header } from '../components/layout/Header';
-import { TransactionCard } from '../components/TransactionCard';
-import { FloatingActionButton } from '../components/FloatingActionButton';
-import { TransactionEditModal } from '../components/TransactionEditModal';
-import { Filter, Search, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Transaction } from '../lib/types';
-import { mockTransactions } from '../lib/mockData';
-import { apiClient, getCurrentUserId, shouldUseMockData } from '../lib/api';
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { Header } from '../components/layout/Header'
+import { TransactionCard } from '../components/TransactionCard'
+import { FloatingActionButton } from '../components/FloatingActionButton'
+import { TransactionEditModal } from '../components/TransactionEditModal'
+import {
+  Filter,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown
+} from 'lucide-react'
+import type { Transaction } from '../lib/types'
+import { mockTransactions } from '../lib/mockData'
+import { apiClient, getCurrentUserId, shouldUseMockData } from '../lib/api'
 
-export function Transactions() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [availableAccounts, setAvailableAccounts] = useState<Array<{ account_id: number; account_name: string }>>([]);
-  const pageSize = 1000;
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function Transactions () {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [availableAccounts, setAvailableAccounts] = useState<
+    Array<{ account_id: number; account_name: string }>
+  >([])
+  const [showFilters, setShowFilters] = useState(false)
+  const [topXTransactions, setTopXTransactions] = useState<number | ''>('')
+  const pageSize = 1000
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Debounce search query - update debouncedSearchQuery 300ms after user stops typing
   useEffect(() => {
     if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+      clearTimeout(searchTimeoutRef.current)
     }
-    
+
     searchTimeoutRef.current = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-      setCurrentPage(1);
-    }, 300);
+      setDebouncedSearchQuery(searchQuery)
+      setCurrentPage(1)
+    }, 300)
 
     return () => {
       if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+        clearTimeout(searchTimeoutRef.current)
       }
-    };
-  }, [searchQuery]);
+    }
+  }, [searchQuery])
 
   const getTransactionAmount = (transaction: any) => {
-    if (!transaction.detailed_entries || transaction.detailed_entries.length === 0) {
-      return 0;
+    if (
+      !transaction.detailed_entries ||
+      transaction.detailed_entries.length === 0
+    ) {
+      return 0
     }
-    
+
     // Sum all debits
     const debitSum = transaction.detailed_entries
       .filter((e: any) => e.entry_type === 'debit')
-      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0);
-    
+      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0)
+
     // Sum all credits as fallback
     const creditSum = transaction.detailed_entries
       .filter((e: any) => e.entry_type === 'credit')
-      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0);
-    
-    return debitSum > 0 ? debitSum : creditSum;
-  };
+      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0)
 
-  const categories = useMemo(() => ['all', ...new Set(transactions.flatMap((t) => 
-    t.entries.map((e: any) => e.account_name)
-  ))], [transactions]);
+    return debitSum > 0 ? debitSum : creditSum
+  }
 
-  const filteredTransactions = useMemo(() => 
-    transactions
-      .filter((transaction) => {
-        const matchesSearch = transaction.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+  const categories = useMemo(
+    () => [
+      'all',
+      ...new Set(
+        transactions.flatMap(t => t.entries.map((e: any) => e.account_name))
+      )
+    ],
+    [transactions]
+  )
+
+  const filteredTransactions = useMemo(() => {
+    let result = transactions
+      .filter(transaction => {
+        const matchesSearch = transaction.description
+          .toLowerCase()
+          .includes(debouncedSearchQuery.toLowerCase())
         const matchesCategory =
-          selectedCategory === 'all' || 
-          transaction.entries.some((e: any) => e.account_name === selectedCategory);
-        return matchesSearch && matchesCategory;
+          selectedCategory === 'all' ||
+          transaction.entries.some(
+            (e: any) => e.account_name === selectedCategory
+          )
+        return matchesSearch && matchesCategory
       })
       .sort((a, b) => {
-        let compareValue = 0;
-        
+        let compareValue = 0
+
         if (sortBy === 'date') {
-          compareValue = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
+          compareValue =
+            new Date(a.transaction_date).getTime() -
+            new Date(b.transaction_date).getTime()
         } else if (sortBy === 'amount') {
-          const aAmount = getTransactionAmount(a);
-          const bAmount = getTransactionAmount(b);
-          compareValue = aAmount - bAmount;
+          const aAmount = getTransactionAmount(a)
+          const bAmount = getTransactionAmount(b)
+          compareValue = aAmount - bAmount
         }
-        
-        return sortOrder === 'asc' ? compareValue : -compareValue;
-      }),
-    [transactions, debouncedSearchQuery, selectedCategory, sortBy, sortOrder]
-  );
+
+        return sortOrder === 'asc' ? compareValue : -compareValue
+      })
+
+    // Apply top X filter if set
+    if (topXTransactions && topXTransactions > 0) {
+      result = result.slice(0, topXTransactions)
+    }
+
+    return result
+  }, [
+    transactions,
+    debouncedSearchQuery,
+    selectedCategory,
+    sortBy,
+    sortOrder,
+    topXTransactions
+  ])
 
   useEffect(() => {
-    const userId = getCurrentUserId();
-    const useMockData = shouldUseMockData(userId);
+    const userId = getCurrentUserId()
+    const useMockData = shouldUseMockData(userId)
 
     if (!userId) {
       // No user set - initialize with empty state
-      console.warn('No user id found in localStorage. Set `userId` in localStorage to fetch transactions.');
-      setTransactions([]);
-      return;
+      console.warn(
+        'No user id found in localStorage. Set `userId` in localStorage to fetch transactions.'
+      )
+      setTransactions([])
+      return
     }
 
     if (useMockData) {
       // Mock data is enabled for this user
-      console.info('Mock data enabled for user ID:', userId);
-      setTransactions(mockTransactions);
-      return;
+      console.info('Mock data enabled for user ID:', userId)
+      setTransactions(mockTransactions)
+      return
     }
 
-    let mounted = true;
+    let mounted = true
 
-    async function fetchTransactions() {
-      setLoading(true);
-      setError(null);
+    async function fetchTransactions () {
+      setLoading(true)
+      setError(null)
       try {
         // Convert date strings to ISO format for API
         const params: any = {
           page: currentPage,
-          pageSize,
-        };
-        if (startDate) params.startDate = new Date(startDate).toISOString();
-        if (endDate) params.endDate = new Date(endDate).toISOString();
+          pageSize
+        }
+        if (startDate) params.startDate = new Date(startDate).toISOString()
+        if (endDate) params.endDate = new Date(endDate).toISOString()
 
-        const response = (await apiClient.getTransactions(userId as number, params)) as any;
+        const response = (await apiClient.getTransactions(
+          userId as number,
+          params
+        )) as any
 
-        console.log(response);
+        console.log(response)
 
         // Handle paginated response
-        const data = response.transactions || response;
-        const isPaginated = response.transactions !== undefined;
+        const data = response.transactions || response
+        const isPaginated = response.transactions !== undefined
 
         // Map backend transaction shape to match Transaction interface
         const mapped = (data || []).map((tx: any) => ({
@@ -140,264 +184,333 @@ export function Transactions() {
           transaction_date: tx.transaction_date,
           reference: tx.reference,
           entries: tx.entries || [],
-          detailed_entries: tx.detailed_entries || [],
-        }));
+          detailed_entries: tx.detailed_entries || []
+        }))
 
         if (mounted) {
-          setTransactions(mapped.length ? mapped : []);
+          setTransactions(mapped.length ? mapped : [])
           if (isPaginated) {
-            setTotalCount(response.total_count);
-            setTotalPages(response.total_pages);
+            setTotalCount(response.total_count)
+            setTotalPages(response.total_pages)
           }
         }
       } catch (err: any) {
-        console.error('Failed to fetch transactions', err);
-        if (mounted) setError(err?.message || 'Failed to fetch transactions');
+        console.error('Failed to fetch transactions', err)
+        if (mounted) setError(err?.message || 'Failed to fetch transactions')
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) setLoading(false)
       }
     }
 
-    fetchTransactions();
+    fetchTransactions()
 
     return () => {
-      mounted = false;
-    };
-  }, [currentPage, startDate, endDate]);
+      mounted = false
+    }
+  }, [currentPage, startDate, endDate])
 
   // Fetch available accounts
   useEffect(() => {
-    const userId = getCurrentUserId();
-    if (!userId) return;
+    const userId = getCurrentUserId()
+    if (!userId) return
 
-    const useMockData = shouldUseMockData(userId);
+    const useMockData = shouldUseMockData(userId)
     if (useMockData) {
       // Set mock accounts
       setAvailableAccounts([
         { account_id: 1, account_name: 'Checking' },
         { account_id: 2, account_name: 'Savings' },
         { account_id: 3, account_name: 'Groceries' },
-        { account_id: 4, account_name: 'Utilities' },
-      ]);
-      return;
+        { account_id: 4, account_name: 'Utilities' }
+      ])
+      return
     }
 
-    let mounted = true;
+    let mounted = true
 
-    async function fetchAccounts() {
+    async function fetchAccounts () {
       try {
-        const response: any = await apiClient.getAccountsByUser(userId as number);
+        const response: any = await apiClient.getAccountsByUser(
+          userId as number
+        )
         if (mounted) {
           // Map the response to the expected format
-          const accounts = (response.accounts || response || []).map((acc: any) => ({
-            account_id: acc.account_id,
-            account_name: acc.account_name,
-          }));
-          setAvailableAccounts(accounts);
+          const accounts = (response.accounts || response || []).map(
+            (acc: any) => ({
+              account_id: acc.account_id,
+              account_name: acc.account_name
+            })
+          )
+          setAvailableAccounts(accounts)
         }
       } catch (err) {
-        console.error('Failed to fetch accounts', err);
+        console.error('Failed to fetch accounts', err)
       }
     }
 
-    fetchAccounts();
+    fetchAccounts()
 
     return () => {
-      mounted = false;
-    };
-  }, []);
+      mounted = false
+    }
+  }, [])
 
   const handleEditTransaction = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setIsModalOpen(true);
-  };
+    setSelectedTransaction(transaction)
+    setIsModalOpen(true)
+  }
 
   const handleSaveTransaction = async (updatedTransaction: Transaction) => {
-    const userId = getCurrentUserId();
-    if (!userId || !selectedTransaction) return;
+    const userId = getCurrentUserId()
+    if (!userId || !selectedTransaction) return
 
-    const useMockData = shouldUseMockData(userId);
+    const useMockData = shouldUseMockData(userId)
     if (useMockData) {
       // Update mock data
       setTransactions(prev =>
-        prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t)
-      );
-      return;
+        prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
+      )
+      return
     }
 
     try {
       await apiClient.updateTransaction(updatedTransaction.id, userId, {
         description: updatedTransaction.description,
         transaction_date: updatedTransaction.transaction_date,
-        detailed_entries: updatedTransaction.detailed_entries,
-      });
+        detailed_entries: updatedTransaction.detailed_entries
+      })
 
       setTransactions(prev =>
-        prev.map(t => t.id === updatedTransaction.id ? updatedTransaction : t)
-      );
+        prev.map(t => (t.id === updatedTransaction.id ? updatedTransaction : t))
+      )
     } catch (err) {
-      console.error('Failed to update transaction', err);
-      throw err;
+      console.error('Failed to update transaction', err)
+      throw err
     }
-  };
+  }
 
   const handleDeleteTransaction = async (transactionId: number) => {
-    const userId = getCurrentUserId();
-    if (!userId) return;
+    const userId = getCurrentUserId()
+    if (!userId) return
 
-    const useMockData = shouldUseMockData(userId);
+    const useMockData = shouldUseMockData(userId)
     if (useMockData) {
-      setTransactions(prev => prev.filter(t => t.id !== transactionId));
-      return;
+      setTransactions(prev => prev.filter(t => t.id !== transactionId))
+      return
     }
 
     try {
-      await apiClient.deleteTransaction(transactionId, userId);
-      setTransactions(prev => prev.filter(t => t.id !== transactionId));
+      await apiClient.deleteTransaction(transactionId, userId)
+      setTransactions(prev => prev.filter(t => t.id !== transactionId))
     } catch (err) {
-      console.error('Failed to delete transaction', err);
-      throw err;
+      console.error('Failed to delete transaction', err)
+      throw err
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header title="Transactions" />
+    <div className='min-h-screen bg-background'>
+      <Header title='Transactions' />
 
-      <div className="max-w-7xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6">
+      <div className='max-w-7xl mx-auto px-4 py-6 md:px-6 md:py-8 space-y-6'>
         {/* Date Range Filter */}
-        <div className="card p-4 ">
-          <div className="flex flex-row flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-40">
-              <label className="text-sm text-secondary mb-2 block">Start Date</label>
+        <div className='card p-4 '>
+          <div className='flex flex-row flex-wrap gap-4 items-end'>
+            <div className='flex-1 min-w-40'>
+              <label className='text-sm text-secondary mb-2 block'>
+                Start Date
+              </label>
               <input
-                type="date"
+                type='date'
                 value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setCurrentPage(1);
+                onChange={e => {
+                  setStartDate(e.target.value)
+                  setCurrentPage(1)
                 }}
-                className="input w-full"
+                className='input w-full'
               />
             </div>
-            <div className="flex-1 min-w-40">
-              <label className="text-sm text-secondary mb-2 block">End Date</label>
+            <div className='flex-1 min-w-40'>
+              <label className='text-sm text-secondary mb-2 block'>
+                End Date
+              </label>
               <input
-                type="date"
+                type='date'
                 value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setCurrentPage(1);
+                onChange={e => {
+                  setEndDate(e.target.value)
+                  setCurrentPage(1)
                 }}
-                className="input w-full"
+                className='input w-full'
               />
             </div>
             <button
               onClick={() => {
-                setStartDate('');
-                setEndDate('');
-                setCurrentPage(1);
+                setStartDate('')
+                setEndDate('')
+                setCurrentPage(1)
               }}
-              className="input px-4 py-2 hover:bg-opacity-80 transition-all"
+              className='input px-4 py-2 hover:bg-opacity-80 transition-all'
             >
               Clear Dates
             </button>
           </div>
         </div>
 
-        {/* Search and Filter */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-secondary" />
+        {/* Search */}
+        <div className='flex flex-col gap-4'>
+          <div className='flex-1 relative'>
+            <Search className='absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-secondary' />
             <input
-              type="text"
+              type='text'
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search transactions..."
-              className="input w-full pl-12"
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder='Search transactions...'
+              className='input w-full pl-12'
             />
           </div>
 
-          <div className="relative">
-            <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-secondary" />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="input pl-12 pr-4 appearance-none cursor-pointer"
-            >
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Toggle Filters */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className='flex items-center gap-2 input px-4 py-2 hover:bg-opacity-80 transition-all w-fit'
+          >
+            <Filter size={18} />
+            Toggle Filters
+            <ChevronDown
+              size={18}
+              className={`transform transition-transform ${
+                showFilters ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
-          <div className="relative">
-            <ArrowUpDown className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-secondary" />
+          {/* Collapsible Filters */}
+          {showFilters && (
+            <div className='card p-4 space-y-4'>
+              {/* Category Filter */}
+              <div>
+                <label className='text-sm text-secondary mb-2 block'>
+                  Filter by Category
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={e => setSelectedCategory(e.target.value)}
+                  className='input w-full appearance-none cursor-pointer'
+                >
+                  {categories.map(category => (
+                    <option key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Top X Transactions Filter */}
+              <div>
+                <label className='text-sm text-secondary mb-2 block'>
+                  Keep Top X Transactions
+                </label>
+                <input
+                  type='number'
+                  value={topXTransactions}
+                  onChange={e =>
+                    setTopXTransactions(
+                      e.target.value === '' ? '' : parseInt(e.target.value)
+                    )
+                  }
+                  placeholder='Leave empty for all'
+                  className='input w-full'
+                  min='1'
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sort By */}
+        <div>
+          <label className='text-sm text-secondary mb-2 block'>Sort By</label>
+          <div className='flex gap-2'>
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'amount')}
-              className="input pl-12 pr-4 appearance-none cursor-pointer"
+              onChange={e => setSortBy(e.target.value as 'date' | 'amount')}
+              className='input flex-1 appearance-none cursor-pointer'
             >
-              <option value="date">Sort by Date</option>
-              <option value="amount">Sort by Amount</option>
+              <option value='date'>Date</option>
+              <option value='amount'>Amount</option>
             </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className='input px-4 py-2 hover:bg-opacity-80 transition-all'
+              title={`Currently sorted ${
+                sortOrder === 'asc' ? 'ascending' : 'descending'
+              }`}
+            >
+              {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
+            </button>
           </div>
-
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="input px-4 py-2 hover:bg-opacity-80 transition-all"
-            title={`Currently sorted ${sortOrder === 'asc' ? 'ascending' : 'descending'}`}
-          >
-            {sortOrder === 'asc' ? '↑ ASC' : '↓ DESC'}
-          </button>
         </div>
 
         {/* Transaction Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="card">
-            <p className="text-sm text-secondary mb-1">Total</p>
-            <p className="text-xl font-bold text-primary">
+        <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+          <div className='card'>
+            <p className='text-sm text-secondary mb-1'>Total</p>
+            <p className='text-xl font-bold text-primary'>
               {filteredTransactions.length}
             </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-secondary mb-1">Income</p>
-            <p className="text-xl font-bold text-success">
-              {filteredTransactions.filter((t) => t.detailed_entries?.some((e: any) => e.entry_type === 'credit')).length}
+          <div className='card'>
+            <p className='text-sm text-secondary mb-1'>Sum</p>
+            <p className='text-xl font-bold text-primary'>
+              {filteredTransactions
+                .reduce((sum, t) => sum + getTransactionAmount(t), 0)
+                .toFixed(2)}
             </p>
           </div>
-          <div className="card">
-            <p className="text-sm text-secondary mb-1">Expenses</p>
-            <p className="text-xl font-bold text-error">
-              {filteredTransactions.filter((t) => !t.detailed_entries?.some((e: any) => e.entry_type === 'credit')).length}
-            </p>
-          </div>
-          <div className="card">
-            <p className="text-sm text-secondary mb-1">This Month</p>
-            <p className="text-xl font-bold text-primary">
+          <div className='card'>
+            <p className='text-sm text-secondary mb-1'>This Month</p>
+            <p className='text-xl font-bold text-primary'>
               {
-                filteredTransactions.filter((t) =>
-                  t.transaction_date.startsWith('2025-11')
-                ).length
+                filteredTransactions.filter(t => {
+                  console.log(t.transaction_date)
+                  const currentDate = new Date()
+                  const yearMonth = `${currentDate.getFullYear()}-${String(
+                    currentDate.getMonth() + 1
+                  ).padStart(2, '0')}`
+                  console.log(yearMonth)
+                  return t.transaction_date.startsWith(yearMonth)
+                }).length
               }
+            </p>
+          </div>
+          <div className='card'>
+            <p className='text-sm text-secondary mb-1'>Average</p>
+            <p className='text-xl font-bold text-primary'>
+              {filteredTransactions.length > 0
+                ? (
+                    filteredTransactions.reduce(
+                      (sum, t) => sum + getTransactionAmount(t),
+                      0
+                    ) / filteredTransactions.length
+                  ).toFixed(2)
+                : '0.00'}
             </p>
           </div>
         </div>
 
         {/* Transactions List */}
-        <div className="space-y-3">
+        <div className='space-y-3'>
           {loading ? (
-            <div className="card text-center py-12">
-              <p className="text-secondary">Loading transactions...</p>
+            <div className='card text-center py-12'>
+              <p className='text-secondary'>Loading transactions...</p>
             </div>
           ) : error ? (
-            <div className="card text-center py-12">
-              <p className="text-error">{error}</p>
+            <div className='card text-center py-12'>
+              <p className='text-error'>{error}</p>
             </div>
           ) : filteredTransactions.length > 0 ? (
-            filteredTransactions.map((transaction) => (
+            filteredTransactions.map(transaction => (
               <TransactionCard
                 key={transaction.id}
                 transaction={transaction}
@@ -406,8 +519,8 @@ export function Transactions() {
               />
             ))
           ) : (
-            <div className="card text-center py-12">
-              <p className="text-secondary">No transactions found</p>
+            <div className='card text-center py-12'>
+              <p className='text-secondary'>No transactions found</p>
             </div>
           )}
         </div>
@@ -417,8 +530,8 @@ export function Transactions() {
             transaction={selectedTransaction}
             isOpen={isModalOpen}
             onClose={() => {
-              setIsModalOpen(false);
-              setSelectedTransaction(null);
+              setIsModalOpen(false)
+              setSelectedTransaction(null)
             }}
             onSave={handleSaveTransaction}
             onDelete={handleDeleteTransaction}
@@ -428,26 +541,34 @@ export function Transactions() {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="card p-4">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-secondary">
-                Page <span className="font-semibold text-primary">{currentPage}</span> of{' '}
-                <span className="font-semibold text-primary">{totalPages}</span> (
-                <span className="font-semibold text-primary">{totalCount}</span> total)
+          <div className='card p-4'>
+            <div className='flex flex-col md:flex-row items-center justify-between gap-4'>
+              <div className='text-sm text-secondary'>
+                Page{' '}
+                <span className='font-semibold text-primary'>
+                  {currentPage}
+                </span>{' '}
+                of{' '}
+                <span className='font-semibold text-primary'>{totalPages}</span>{' '}
+                (
+                <span className='font-semibold text-primary'>{totalCount}</span>{' '}
+                total)
               </div>
-              <div className="flex gap-2">
+              <div className='flex gap-2'>
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="input px-4 py-2 hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className='input px-4 py-2 hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
                 >
                   <ChevronLeft size={18} />
                   Previous
                 </button>
                 <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  onClick={() =>
+                    setCurrentPage(Math.min(totalPages, currentPage + 1))
+                  }
                   disabled={currentPage === totalPages}
-                  className="input px-4 py-2 hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className='input px-4 py-2 hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2'
                 >
                   Next
                   <ChevronRight size={18} />
@@ -460,5 +581,5 @@ export function Transactions() {
 
       <FloatingActionButton />
     </div>
-  );
+  )
 }
