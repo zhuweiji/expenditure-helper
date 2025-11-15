@@ -17,8 +17,8 @@ export function Home() {
     const useMockData = shouldUseMockData(userId);
 
     if (!userId) {
-      // No user set - initialize with empty state
-      console.warn('No user id found in localStorage. Set `userId` in localStorage to fetch transactions.');
+      // This should not happen as ProtectedRoute prevents unauthenticated access
+      console.warn('No user id found in localStorage.');
       setRecentTransactions([]);
       setCategorySpending([]);
       return;

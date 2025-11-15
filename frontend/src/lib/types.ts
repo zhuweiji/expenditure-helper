@@ -11,7 +11,6 @@ export interface Transaction {
   description: string;
   transaction_date: string;
   reference?: string;
-  amount: number;
   entries: TransactionEntry[];
   detailed_entries: TransactionEntry[];
 }
@@ -58,6 +57,8 @@ export interface PrepareEntriesResponse {
   total_transactions: number;
   total_debits: number;
   total_credits: number;
+  cc_debit_amount: number;
+  cc_credit_amount: number;
   is_balanced: boolean;
 }
 
@@ -89,7 +90,6 @@ export interface PrepareEntriesRequest {
   default_expense_account_id: number;
   bank_account_id?: number | null;
   category_mappings?: CategoryMapping[];
-  dry_run: boolean;
 }
 
 export interface Account {

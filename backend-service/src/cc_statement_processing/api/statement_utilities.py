@@ -10,8 +10,13 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from src.common.logger import get_logger
 from src.common.project_paths import cc_statement_dir
+from src.database import get_db_session
 
-from ..models import Statement
+from ..models import Statement, StatementProcessing
+from ..repositories.statement_repository import (
+    StatementProcessingRepository,
+    StatementRepository,
+)
 from ..services.cc_statement_processor import CreditCardStatementProcessor
 
 log = get_logger(__name__)
@@ -81,22 +86,66 @@ async def save_uploaded_file(file_data: bytes, file_path: Path) -> bytes:
     return file_data
 
 
-async def process_pdf_with_ai(pdf_content: bytes, statement_id: int) -> str:
+async def process_statement_background(
+    statement_id: int, processing_id: int, pdf_content: bytes
+):
     """
-    Process PDF content using AI to extract transaction data.
+    Background task to process the statement PDF and update the database.
 
     Args:
+        statement_id: ID of the statement
+        processing_id: ID of the processing record
         pdf_content: The PDF file content as bytes
-        statement_id: ID of the statement being processed
-
-    Returns:
-        CSV output from the processing
     """
+    log.info(f"Background processing started for statement ID: {statement_id}")
+
     processor = CreditCardStatementProcessor()
-    log.debug(f"Initialized PDF processor for statement ID: {statement_id}")
-    csv_output = await processor.process_pdf_statement_async(pdf_content)
-    log.info(f"Successfully processed PDF statement (ID: {statement_id})")
-    return csv_output
+
+    # Create a new database session for the background task
+    db = next(get_db_session())
+
+    try:
+        # Process the PDF and extract CSV
+        csv_output = await processor.process_pdf_statement_async(pdf_content)
+
+        # Update records with success
+        statement = db.query(Statement).filter(Statement.id == statement_id).first()
+        processing_record = (
+            db.query(StatementProcessing)
+            .filter(StatementProcessing.id == processing_id)
+            .first()
+        )
+
+        if statement and processing_record:
+            StatementRepository.update_statement_csv_output(statement, csv_output, db)
+            StatementProcessingRepository.update_to_completed(processing_record, db)
+            log.info(
+                f"Completed background processing for statement (ID: {statement_id})"
+            )
+        else:
+            log.warning(
+                f"Statement or processing record not found for ID: {statement_id}"
+            )
+
+    except Exception as e:
+        # Log and update the processing record with error
+        log.error(
+            f"Error in background processing of statement ID {statement_id}: {str(e)}",
+            exc_info=True,
+        )
+        processing_record = (
+            db.query(StatementProcessing)
+            .filter(StatementProcessing.id == processing_id)
+            .first()
+        )
+        if processing_record:
+            StatementProcessingRepository.update_to_errored(
+                processing_record, str(e), db
+            )
+
+    finally:
+        # Close the database session
+        db.close()
 
 
 def cleanup_file(file_path: Path | None) -> None:

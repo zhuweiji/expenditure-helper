@@ -13,7 +13,7 @@ export function TransactionCard({ transaction, onClick }: TransactionCardProps) 
   // Calculate amount from detailed entries
   const calculateAmount = () => {
     if (!transaction.detailed_entries || transaction.detailed_entries.length === 0) {
-      return transaction.amount || 0;
+      return 0;
     }
     
     // Sum all credits

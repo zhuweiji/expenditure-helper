@@ -14,7 +14,6 @@ from ..repositories.statement_repository import (
     StatementProcessingRepository,
     StatementRepository,
 )
-from .background_tasks import process_statement_background
 from .statement_schemas import (
     ProcessingDetailResponse,
     ProcessingListResponse,
@@ -27,6 +26,7 @@ from .statement_utilities import (
     compute_file_hash,
     filter_duplicate_file_uploads,
     generate_safe_filename,
+    process_statement_background,
     save_uploaded_file,
     validate_pdf_file,
 )
@@ -435,3 +435,63 @@ async def delete_processing_record(
 
     log.info(f"Successfully deleted processing record ID: {processing_id}")
     return {"message": f"Processing record {processing_id} deleted successfully"}
+
+
+@router.delete("/user/{user_id}/all")
+async def delete_all_user_statements(
+    user_id: int,
+    db: Session = Depends(get_db_session),
+):
+    """
+    Delete all statements and their associated processing records for a specific user.
+    Also deletes the physical PDF files from disk.
+
+    Args:
+        user_id: ID of the user whose statements to delete
+        db: Database session
+
+    Returns:
+        Success message with count of deleted statements
+    """
+    log.info(f"Attempting to delete all statements for user ID: {user_id}")
+
+    statements = db.query(Statement).filter(Statement.user_id == user_id).all()
+
+    if not statements:
+        log.info(f"No statements found for user ID: {user_id}")
+        return {"message": "No statements found for user", "deleted_count": 0}
+
+    deleted_count = 0
+    for statement in statements:
+        try:
+            # Delete the associated processing record first (if exists)
+            if statement.processing:
+                db.delete(statement.processing)
+                log.info(f"Deleted processing record for statement ID: {statement.id}")
+
+            # Delete the physical file
+            file_path = Path(statement.saved_path)
+            if file_path.exists():
+                file_path.unlink()
+                log.info(f"Deleted physical file: {file_path}")
+            else:
+                log.warning(f"Physical file not found: {file_path}")
+
+            # Delete the statement record
+            db.delete(statement)
+            deleted_count += 1
+        except Exception as e:
+            log.error(f"Error deleting statement ID: {statement.id}: {str(e)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting statements: {str(e)}",
+            )
+
+    db.commit()
+
+    log.info(f"Successfully deleted {deleted_count} statements for user ID: {user_id}")
+    return {
+        "message": f"All statements for user {user_id} deleted successfully",
+        "deleted_count": deleted_count,
+    }

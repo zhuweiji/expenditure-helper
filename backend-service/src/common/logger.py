@@ -25,7 +25,7 @@ def get_logger(
 
     # Only add handlers if they haven't been added yet
     if not logger.handlers:
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
 
         # Create formatter
         formatter = logging.Formatter("%(name)s-%(levelname)s|%(lineno)d:  %(message)s")
@@ -44,7 +44,7 @@ def get_logger(
 
         # Console handler
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 

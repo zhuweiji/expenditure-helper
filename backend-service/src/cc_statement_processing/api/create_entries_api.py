@@ -14,6 +14,7 @@ from .create_entries_schemas import (
 )
 from .create_entries_utilities import (
     _build_transaction_previews,
+    _calculate_cc_amounts,
     _get_account_by_id,
     resolve_user_accounts,
 )
@@ -72,7 +73,6 @@ def prepare_entries_from_statement(
     # Validate all accounts exist and belong to user
     accounts = resolve_user_accounts(request, db)
 
-    # Create a nested transaction to rollback changes
     # We'll use a savepoint to test the entries without committing
     try:
         # Create the service
@@ -92,13 +92,19 @@ def prepare_entries_from_statement(
             }
             service.set_category_account_mapping(category_mapping)
 
-        # Create a savepoint
-        db.begin_nested()
+        transactions_data = service.build_ledger_entries_data(
+            statement.csv_output,
+            accounts.credit_card_account.id,
+            accounts.default_expense_account.id,
+            service.category_account_mapping,
+            accounts.bank_account.id if accounts.bank_account else None,
+        )
+        log.info(statement.csv_output)
+        log.info(transactions_data)
+        transactions = service.create_ledger_objects(
+            user_id=request.user_id, transactions_data=transactions_data
+        )
 
-        # Process the CSV and create entries (will be rolled back)
-        transactions = service.create_ledger_entries(statement.csv_output)
-
-        # Build preview
         transaction_previews = _build_transaction_previews(transactions, db)
 
         # Calculate totals
@@ -115,6 +121,11 @@ def prepare_entries_from_statement(
             if entry.entry_type == "credit"
         )
 
+        # Calculate CC-specific amounts
+        cc_debit_amount, cc_credit_amount = _calculate_cc_amounts(
+            transaction_previews, accounts.credit_card_account.id
+        )
+
         # Validate transactions
         is_balanced = service.validate_transactions(transactions)
 
@@ -125,6 +136,8 @@ def prepare_entries_from_statement(
             total_transactions=len(transactions),
             total_debits=total_debits,
             total_credits=total_credits,
+            cc_debit_amount=cc_debit_amount,
+            cc_credit_amount=cc_credit_amount,
             is_balanced=is_balanced,
         )
 
@@ -132,14 +145,9 @@ def prepare_entries_from_statement(
             f"Prepared {len(transactions)} transactions for statement {statement_id}"
         )
 
-        # Rollback the nested transaction
-        if request.dry_run:
-            db.rollback()
-
         return response
 
     except Exception as e:
-        db.rollback()
         log.error(f"Error preparing entries for statement {statement_id}: {str(e)}")
         raise HTTPException(
             status_code=500,

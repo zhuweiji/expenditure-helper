@@ -26,8 +26,11 @@ export function PreviewStage () {
   const [isLoading, setIsLoading] = useState(false)
   const userId = getCurrentUserId()
 
-  // Load accounts on mount
+  // Load accounts on mount and clear stale preview data
   useEffect(() => {
+    // Clear any stale preview data when entering this stage
+    setPreview(null)
+
     const currentUserId = getCurrentUserId()
 
     if (currentUserId) {
@@ -111,7 +114,6 @@ export function PreviewStage () {
         credit_card_account_id: creditCardAccountId,
         default_expense_account_id: defaultExpenseAccountId,
         bank_account_id: bankAccountId,
-        dry_run: true
       }
 
       const previewData = await apiClient.prepareEntries(request)
@@ -163,6 +165,8 @@ export function PreviewStage () {
               total_transactions: 0,
               total_debits: 0,
               total_credits: 0,
+              cc_debit_amount: 0,
+              cc_credit_amount: 0,
               is_balanced: false
             }
           }

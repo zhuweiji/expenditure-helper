@@ -159,3 +159,30 @@ def _build_transaction_previews(
         )
 
     return previews
+
+
+def _calculate_cc_amounts(
+    transaction_previews: list[TransactionPreview], credit_card_account_id: int
+) -> tuple[float, float]:
+    """
+    Calculate total debit and credit amounts for the credit card account.
+
+    Args:
+        transaction_previews: List of transaction previews
+        credit_card_account_id: ID of the credit card account
+
+    Returns:
+        Tuple of (cc_debit_amount, cc_credit_amount)
+    """
+    cc_debit_amount = 0.0
+    cc_credit_amount = 0.0
+
+    for txn in transaction_previews:
+        for entry in txn.entries:
+            if entry.account_id == credit_card_account_id:
+                if entry.entry_type == "debit":
+                    cc_debit_amount += entry.amount
+                elif entry.entry_type == "credit":
+                    cc_credit_amount += entry.amount
+
+    return cc_debit_amount, cc_credit_amount

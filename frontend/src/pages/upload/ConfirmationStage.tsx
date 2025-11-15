@@ -45,23 +45,23 @@ export function ConfirmationStage() {
         return;
       }
 
-      // Prepare transactions for batch creation
+      // Create transactions as-is from preview result
       const preview = state.preview;
       const transactions: CreateTransactionRequest[] = preview.transactions.map(
         (transaction) => ({
           user_id: userId,
-          description: `CC Statement - ${preview.statement_filename}`,
+          description: transaction.description,
           transaction_date: transaction.transaction_date,
-          reference: `statement-${preview.statement_id}`,
           entries: transaction.entries.map((entry) => ({
             account_id: entry.account_id,
             amount: entry.amount,
             entry_type: entry.entry_type,
             description: entry.description,
-            timestamp: transaction.transaction_date,
           })),
         })
       );
+
+      console.log('transactions to create', transactions);
 
       // Create all transactions in batch
       await apiClient.batchCreateTransactions(userId, transactions);

@@ -87,13 +87,14 @@ def delete_account(
 @router.delete("/user/{user_id}/clear")
 def clear_all_accounts(user_id: int, db: Session = Depends(get_db_session)):
     """Clear all transactions from all accounts for a specific user"""
-    # Delete all transactions owned by the user
-    # This will cascade-delete all associated entries through the relationship
-    deleted_count = (
-        db.query(Transaction)
-        .filter(Transaction.user_id == user_id)
-        .delete(synchronize_session=False)
-    )
+    # Get all transactions owned by the user
+    transactions = db.query(Transaction).filter(Transaction.user_id == user_id).all()
+    deleted_count = len(transactions)
+
+    # Delete each transaction individually to trigger cascade deletes for entries
+    for transaction in transactions:
+        db.delete(transaction)
+
     db.commit()
 
     log.info(

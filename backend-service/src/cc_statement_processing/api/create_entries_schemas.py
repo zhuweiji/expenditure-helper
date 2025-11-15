@@ -30,11 +30,6 @@ class CreateEntriesRequest(BaseModel):
         description="Optional mappings of category names to specific expense account IDs",
     )
 
-    dry_run: Optional[bool] = Field(
-        True,
-        description="If true, prepare entries without persisting them to the database",
-    )
-
 
 class EntryPreview(BaseModel):
     """Preview of a ledger entry to be created"""
@@ -63,6 +58,8 @@ class PrepareEntriesResponse(BaseModel):
     total_transactions: int
     total_debits: float
     total_credits: float
+    cc_debit_amount: float
+    cc_credit_amount: float
     is_balanced: bool
 
 

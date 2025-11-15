@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from src.common.logger import get_logger
 from src.database import get_db_session
 
 from ..models.account import Account
@@ -15,6 +16,7 @@ from .transactions_schemas import (
     TransactionUpdate,
 )
 
+log = get_logger(__name__)
 router = APIRouter()
 
 
@@ -31,20 +33,21 @@ def _create_transaction_with_entries(
     Returns:
         The created TransactionModel instance
     """
-    db_transaction = TransactionModel(
+    transaction_object = TransactionModel(
         user_id=transaction.user_id,
         description=transaction.description,
         transaction_date=transaction.transaction_date,
         reference=transaction.reference,
     )
-    db.add(db_transaction)
-    db.commit()
-    db.refresh(db_transaction)
+    log.info(transaction_object.__dict__)
+
+    db.add(transaction_object)
+    db.flush()
 
     # Add entries if provided
     for entry in transaction.entries:
         db_entry = EntryModel(
-            transaction_id=db_transaction.id,
+            transaction_id=transaction_object.id,
             account_id=entry.account_id,
             amount=entry.amount,
             entry_type=entry.entry_type,
@@ -52,9 +55,11 @@ def _create_transaction_with_entries(
             timestamp=entry.timestamp if entry.timestamp else datetime.utcnow(),
         )
         db.add(db_entry)
+        log.info(db_entry)
+
     db.commit()
-    db.refresh(db_transaction)
-    return db_transaction
+    db.refresh(transaction_object)
+    return transaction_object
 
 
 @router.post("")
@@ -83,6 +88,8 @@ def batch_create_transactions(
     for transaction in transactions:
         db_transaction = _create_transaction_with_entries(transaction, db)
         created_transactions.append(db_transaction)
+
+    log.info("Batch created transactions", [t.__dict__ for t in created_transactions])
     return created_transactions
 
 

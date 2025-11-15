@@ -106,7 +106,7 @@ export function EntryPreview({
           {preview.statement_filename}
         </h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-secondary">Transactions</p>
             <p className="text-2xl font-bold text-primary">
@@ -114,18 +114,20 @@ export function EntryPreview({
             </p>
           </div>
           <div>
-            <p className="text-sm text-secondary">Total Debits</p>
-            <p className="text-2xl font-bold text-primary">
-              {formatCurrency(preview.total_debits)}
+            <p className="text-sm text-secondary">CC Debits (Refunds)</p>
+            <p className="text-2xl font-bold text-error">
+              {formatCurrency(preview.cc_debit_amount)}
             </p>
+            <p className="text-xs text-secondary mt-1">Money returned to card</p>
           </div>
           <div>
-            <p className="text-sm text-secondary">Total Credits</p>
-            <p className="text-2xl font-bold text-primary">
-              {formatCurrency(preview.total_credits)}
+            <p className="text-sm text-secondary">CC Credits (Expenses)</p>
+            <p className="text-2xl font-bold text-success">
+              {formatCurrency(preview.cc_credit_amount)}
             </p>
+            <p className="text-xs text-secondary mt-1">Charges on card</p>
           </div>
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <p className="text-sm text-secondary">Balanced</p>
             <p
               className={`text-2xl font-bold ${
@@ -276,7 +278,9 @@ export function EntryPreview({
               <div className="text-right mr-3">
                 <p className="font-semibold text-primary">
                   {formatCurrency(
-                    transaction.entries.reduce((sum, entry) => sum + entry.amount, 0)
+                    transaction.entries
+                      .filter((entry) => entry.entry_type === 'debit')
+                      .reduce((sum, entry) => sum + entry.amount, 0)
                   )}
                 </p>
                 <p className='text-sm text-secondary'>{transaction.entries.length} entries</p>

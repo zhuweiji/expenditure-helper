@@ -41,6 +41,24 @@ export function Transactions() {
     };
   }, [searchQuery]);
 
+  const getTransactionAmount = (transaction: any) => {
+    if (!transaction.detailed_entries || transaction.detailed_entries.length === 0) {
+      return 0;
+    }
+    
+    // Sum all debits
+    const debitSum = transaction.detailed_entries
+      .filter((e: any) => e.entry_type === 'debit')
+      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0);
+    
+    // Sum all credits as fallback
+    const creditSum = transaction.detailed_entries
+      .filter((e: any) => e.entry_type === 'credit')
+      .reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0);
+    
+    return debitSum > 0 ? debitSum : creditSum;
+  };
+
   const categories = useMemo(() => ['all', ...new Set(transactions.flatMap((t) => 
     t.entries.map((e: any) => e.account_name)
   ))], [transactions]);
@@ -60,7 +78,9 @@ export function Transactions() {
         if (sortBy === 'date') {
           compareValue = new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime();
         } else if (sortBy === 'amount') {
-          compareValue = a.amount - b.amount;
+          const aAmount = getTransactionAmount(a);
+          const bAmount = getTransactionAmount(b);
+          compareValue = aAmount - bAmount;
         }
         
         return sortOrder === 'asc' ? compareValue : -compareValue;
@@ -114,7 +134,6 @@ export function Transactions() {
           description: tx.description,
           transaction_date: tx.transaction_date,
           reference: tx.reference,
-          amount: Number(tx.amount),
           entries: tx.entries || [],
           detailed_entries: tx.detailed_entries || [],
         }));
@@ -246,13 +265,13 @@ export function Transactions() {
           <div className="card">
             <p className="text-sm text-secondary mb-1">Income</p>
             <p className="text-xl font-bold text-success">
-              {filteredTransactions.filter((t) => t.amount >= 0).length}
+              {filteredTransactions.filter((t) => t.detailed_entries?.some((e: any) => e.entry_type === 'credit')).length}
             </p>
           </div>
           <div className="card">
             <p className="text-sm text-secondary mb-1">Expenses</p>
             <p className="text-xl font-bold text-error">
-              {filteredTransactions.filter((t) => t.amount < 0).length}
+              {filteredTransactions.filter((t) => !t.detailed_entries?.some((e: any) => e.entry_type === 'credit')).length}
             </p>
           </div>
           <div className="card">

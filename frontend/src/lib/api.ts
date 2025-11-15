@@ -139,7 +139,14 @@ class ApiClient {
   }
 
   async batchCreateTransactions(userId: number, transactions: any[]) {
-    const transactionsWithUserId = transactions.map(t => ({ ...t, user_id: userId }));
+    const transactionsWithUserId = transactions.map(t => ({
+      user_id: userId,
+      description: t.description,
+      transaction_date: t.transaction_date,
+      reference: t.reference,
+      entries: t.entries,
+    }));
+    console.log('transactionsWithUserId', transactionsWithUserId);
     return this.request('/transactions/batch', {
       method: 'POST',
       body: JSON.stringify(transactionsWithUserId),
@@ -253,6 +260,13 @@ class ApiClient {
   // Clear all transactions/entries for a user
   async clearAllTransactions(userId: number) {
     return this.request(`/accounts/user/${userId}/clear`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Clear all statements for a user
+  async clearAllStatements(userId: number) {
+    return this.request(`/statements/user/${userId}/all`, {
       method: 'DELETE',
     });
   }

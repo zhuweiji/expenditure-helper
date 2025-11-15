@@ -24,6 +24,8 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [showClearStatementsConfirmation, setShowClearStatementsConfirmation] = useState(false);
+  const [isClearingStatements, setIsClearingStatements] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -94,6 +96,25 @@ export function Profile() {
       setError('Failed to clear transactions. Please try again.');
     } finally {
       setIsClearing(false);
+    }
+  };
+
+  const handleClearStatements = async () => {
+    try {
+      const userId = getCurrentUserId();
+      if (!userId) return;
+
+      setIsClearingStatements(true);
+      await apiClient.clearAllStatements(userId);
+      setShowClearStatementsConfirmation(false);
+      setError(null);
+      // Show success message
+      alert('All statements have been cleared successfully.');
+    } catch (err) {
+      console.error('Failed to clear statements:', err);
+      setError('Failed to clear statements. Please try again.');
+    } finally {
+      setIsClearingStatements(false);
     }
   };
 
@@ -362,6 +383,45 @@ export function Profile() {
                   className="flex-1 px-4 py-2 bg-error text-white rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
                 >
                   {isClearing ? 'Clearing...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Clear Statements Button */}
+          {!showClearStatementsConfirmation && (
+            <button
+              onClick={() => setShowClearStatementsConfirmation(true)}
+              className="w-full flex items-center justify-center px-6 py-3 text-error border border-error/30 rounded-lg hover:bg-error/10 transition-colors"
+            >
+              <Trash2 className="mr-2 h-5 w-5" />
+              Clear All Statements
+            </button>
+          )}
+
+          {/* Clear Statements Confirmation */}
+          {showClearStatementsConfirmation && (
+            <div className="bg-error/10 border border-error/30 rounded-lg p-4 space-y-3">
+              <div>
+                <h4 className="font-semibold text-error mb-2">Clear All Statements?</h4>
+                <p className="text-sm text-secondary mb-2">
+                  This action will permanently delete all your uploaded credit card statements and their associated files. This cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowClearStatementsConfirmation(false)}
+                  disabled={isClearingStatements}
+                  className="flex-1 px-4 py-2 border border-secondary/30 rounded-lg hover:bg-secondary/10 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearStatements}
+                  disabled={isClearingStatements}
+                  className="flex-1 px-4 py-2 bg-error text-white rounded-lg hover:bg-error/90 transition-colors disabled:opacity-50"
+                >
+                  {isClearingStatements ? 'Clearing...' : 'Confirm Delete'}
                 </button>
               </div>
             </div>

@@ -14,7 +14,7 @@ export function Sidebar() {
       <div className="flex flex-col flex-1 min-h-0">
         {/* Logo */}
         <div className="flex items-center h-16 flex-shrink-0 px-6 border-b border-secondary/10">
-          <h1 className="text-xl font-bold text-accent">Expenditure Helper</h1>
+          <h1 className="text-xl font-bold text-accent">TrackIt</h1>
         </div>
 
         {/* Navigation */}
